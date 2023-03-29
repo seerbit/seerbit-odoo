@@ -4,6 +4,7 @@ import logging
 import pprint
 import random
 import string
+import warnings
 
 import firebase_admin
 from firebase_admin import credentials, db
@@ -13,6 +14,9 @@ from werkzeug.exceptions import Forbidden
 
 from ..config import config
 from ..utils import format_erp_ref
+
+# Suppress Firebase SyntaxWarning
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="firebase_admin")
 
 _logger = logging.getLogger(__name__)
 
