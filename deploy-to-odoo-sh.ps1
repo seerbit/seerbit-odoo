@@ -178,12 +178,8 @@ function Get-DeploymentConfig {
     
     # Get Seerbit configuration
     Write-Header "Seerbit Configuration"
-    if ([string]::IsNullOrWhiteSpace($SeerbitPublicKey)) {
-        $config['seerbit_public_key'] = Get-UserInput "Seerbit Public Key"
-    }
-    else {
-        $config['seerbit_public_key'] = $SeerbitPublicKey
-    }
+    Write-Info "Note: Seerbit public key should be configured in POS payment method, not via environment variables"
+    Write-Info "You'll configure this after deployment in Point of Sale > Configuration > Payment Methods"
     
     # Service account file
     Write-Header "Service Account File"
@@ -348,7 +344,7 @@ function Show-NextSteps {
     Write-Host "   - Go to Point of Sale > Configuration > Payment Methods"
     Write-Host "   - Create new payment method"
     Write-Host "   - Set Payment Terminal to 'Seerbit'"
-    Write-Host "   - Enter Seerbit Public Key: $($config['seerbit_public_key'])"
+    Write-Host "   - Enter your Seerbit Public Key from your Seerbit dashboard"
     
     Write-Info "6. Test the integration"
     

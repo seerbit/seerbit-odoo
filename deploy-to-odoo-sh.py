@@ -161,7 +161,8 @@ def get_deployment_config():
 
     # Get Seerbit configuration
     print_header("Seerbit Configuration")
-    config['seerbit_public_key'] = get_user_input("Seerbit Public Key")
+    print_info("Note: Seerbit public key should be configured in POS payment method, not via environment variables")
+    print_info("You'll configure this after deployment in Point of Sale > Configuration > Payment Methods")
 
     # Service account file
     print_header("Service Account File")
@@ -299,7 +300,6 @@ def generate_config_file(config):
         'firebase_project_id': config['firebase_project_id'],
         'firebase_db_url': config['firebase_db_url'],
         'firebase_api_key': config['firebase_api_key'][:10] + '...' if config['firebase_api_key'] else '',
-        'seerbit_public_key': config['seerbit_public_key'][:10] + '...' if config['seerbit_public_key'] else '',
         'service_account_path': config['service_account_path']
     }
 
@@ -337,7 +337,7 @@ def show_next_steps(config):
     print("   - Go to Point of Sale > Configuration > Payment Methods")
     print("   - Create new payment method")
     print("   - Set Payment Terminal to 'Seerbit'")
-    print(f"   - Enter Seerbit Public Key: {config['seerbit_public_key']}")
+    print("   - Enter your Seerbit Public Key from your Seerbit dashboard")
 
     print_info("6. Test the integration")
 

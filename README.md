@@ -136,7 +136,7 @@ git push odoo-sh 16.0:master
 #### Seerbit Setup
 
 1. Get your public key from Seerbit dashboard
-2. Configure webhook endpoints (if using webhook fallback)
+2. Configure the public key in POS payment method (not via environment variables)
 3. Test payment flow
 
 ### Development

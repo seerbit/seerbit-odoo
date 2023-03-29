@@ -132,7 +132,7 @@ git push odoo-sh 16.0:master
 3. Fill in the details:
    - **Name**: Seerbit Terminal
    - **Payment Terminal**: Seerbit
-   - **Seerbit Public Key**: Your Seerbit public key
+       - **Seerbit Public Key**: Configure this in POS payment method, not via environment variables
 4. Click **Save**
 
 #### 7.2 Configure POS

@@ -17,27 +17,61 @@ from ..utils import format_erp_ref
 _logger = logging.getLogger(__name__)
 
 # Initialize Firebase only once
-if not firebase_admin._apps:
+_firebase_initialized = False
+
+def initialize_firebase():
+    """Initialize Firebase with proper error handling"""
+    global _firebase_initialized
+    
+    if _firebase_initialized or firebase_admin._apps:
+        return True
+    
     try:
+        # Check if configuration is available
+        if not config.FIREBASE_CRED_PATH or not config.FIREBASE_DB_URL:
+            _logger.warning("Firebase configuration not available. Skipping initialization.")
+            return False
+        
+        # Check if service account file exists
+        import os
+        if not os.path.exists(config.FIREBASE_CRED_PATH):
+            _logger.warning("Firebase service account file not found: %s", config.FIREBASE_CRED_PATH)
+            return False
+        
         cred = credentials.Certificate(config.FIREBASE_CRED_PATH)
         firebase_admin.initialize_app(cred, {
             'databaseURL': config.FIREBASE_DB_URL
         })
+        _firebase_initialized = True
         _logger.info("Firebase initialized successfully")
+        return True
     except Exception as e:
-        _logger.error("Failed to initialize Firebase: %s", str(e))
+        _logger.warning("Failed to initialize Firebase: %s", str(e))
+        return False
+
+# Try to initialize Firebase on module load
+initialize_firebase()
 
 
 def send_to_firebase_transactions(payload):
     """
     Send payment request to Firebase.
     """
-    _logger.info('Sending payment request to Firebase: %s',
-                 pprint.pformat(payload))
-    ref = db.reference('transactions')
-    ref.push(payload)
-    _logger.info('Sent payment request to Firebase: %s',
-                 pprint.pformat(payload))
+    if not initialize_firebase():
+        _logger.warning("Firebase not initialized. Cannot send payment request.")
+        return False
+    
+    try:
+        _logger.info('Sending payment request to Firebase: %s',
+                     pprint.pformat(payload))
+        ref = db.reference('transactions')
+        ref.push(payload)
+        _logger.info('Sent payment request to Firebase: %s',
+                     pprint.pformat(payload))
+        return True
+    except Exception as e:
+        _logger.error("Failed to send payment request to Firebase: %s", str(e))
+        return False
 
 
 class PosPaymentMethod(models.Model):
@@ -95,13 +129,21 @@ class PosPaymentMethod(models.Model):
         if payload.get('erpTransactionRef'):
             payload['erpTransactionRef'] = self._format_erp_ref(
                 payload['erpTransactionRef'])
-        # Send to Firebase
-        send_to_firebase_transactions(payload)
-        # Save to Odoo for tracking
+        
+        # Save to Odoo for tracking first
         self.seerbit_latest_response = json.dumps(payload)
         self.env.cr.commit()
-        _logger.info(
-            "Seerbit payment request saved to Odoo and sent to Firebase: %s", pprint.pformat(payload))
+        
+        # Try to send to Firebase
+        firebase_success = send_to_firebase_transactions(payload)
+        
+        if firebase_success:
+            _logger.info(
+                "Seerbit payment request saved to Odoo and sent to Firebase: %s", pprint.pformat(payload))
+        else:
+            _logger.warning(
+                "Seerbit payment request saved to Odoo but Firebase send failed: %s", pprint.pformat(payload))
+        
         return True
 
     def get_latest_seerbit_status(self, expected):
