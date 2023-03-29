@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'POS Seerbit',
+    'name': 'Seerbit Odoo Point of Sale',
     'version': '0.0.1',
     'category': 'Sales/Point of Sale',
     'summary': 'Integrate your POS with a Seerbit payment terminal',

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Title</title>
+    <title>Seerbit Odoo POS</title>
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -13,13 +13,15 @@
 </head>
 
 <body>
+    <font size="+1">
     <!-- Header -->
     <div class="container">
         <div class="row">
             <div class="col-12 d-flex pt-2 justify-content-between">
-                <div class="px-2 py-2 font-weight-bold text-danger bg-white rounded" style="font-size: larger;">
-                    <img src="./icon.png" alt="Banner" style="height: 20px;" />
-                    <span class="mt-2">SEERBIT</span>
+                
+                    <div class="d-flex align-items-center">
+                    <img src="./icon.png" alt="Banner" style="height: 40px;" />
+                    <span class="ml-2 text-danger font-weight-bold" style="font-size:xx-large;">SEERBIT</span>
                 </div>
                 <div class="d-flex align-items-center">
                     <div class="px-2 py-2 font-weight-bold text-white rounded" style="background-color: #7C7BAD">
@@ -60,6 +62,9 @@
                                 </a>
                                 <a href="#autoflow" class="list-group-item list-group-item-action">
                                     Automated Workflow
+                                </a>
+                                <a href="#history" class="list-group-item list-group-item-action">
+                                    Version History
                                 </a>
                             </div>
                         </div>
@@ -240,10 +245,30 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Version History -->
+                    <div class="col-12 mt-2">
+                        <div class="card-header" id="history">
+                            <div class="row" data-toggle="collapse" data-target="#history_id" aria-expanded="true"
+                                aria-controls="history_id">
+                                <div class="col-10">
+                                    <h5 class="text-danger">Version History</h5>
+                                </div>
+                                <div class="col-2 text-right d-flex justify-content-end align-items-center">
+                                    <i class="fa fa-chevron-right text-danger"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="history_id" class="show" aria-labelledby="history" data-parent="#accordion">
+                            <div class="card-body">
+                                See the <a href="https://github.com/seerbit/seerbit-odoo"><span class="badge badge-dark p-2">Github Repository</span></a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    </font>
 
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
