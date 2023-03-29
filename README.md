@@ -1,13 +1,20 @@
-# [POS_SEERBIT](http://apps.odoo.com/module/v16/pos_seerbit/)
+<div align="center">
+ <img width="400" valign="top" src="./pos_seerbit/static/description/seerbit_logo.png"/>
+</div>
 
-![Banner](./pos_seerbit/static/description/seerbit.gif)   
+<h1 align="center">
+    <a href="https://apps.odoo.com/apps/modules/16.0/pos_seerbit/">
+  POS SEERBIT</a><br/>
+  
+</h1>
+<h2 align="center">
+An Odoo Integration for Seerbit POS Terminal
+</h2>
 
 ## How to Use
----
 A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/seerbit/)
 
 ## Version History
----
 ## **[0.0.1]** 30/03/2023
 ### Impacted Versions:
 - Odoo16 - 30/03/2023
