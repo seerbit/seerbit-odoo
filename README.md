@@ -1,6 +1,6 @@
 # [POS_SEERBIT](http://apps.odoo.com/module/v16/pos_seerbit/)
 
-![Banner](./static/description/seerbit.gif)   
+![Banner](./pos_seerbit/static/description/seerbit.gif)   
 
 ## How to Use
 ---
