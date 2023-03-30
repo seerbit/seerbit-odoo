@@ -1,5 +1,5 @@
 <div align="center">
- <img width="400" valign="top" src="./pos_seerbit/static/description/seerbit_logo.png"/>
+ <img width="400" valign="top" src="https://assets.seerbitapi.com/images/seerbit_logo_type.png"/>
 </div>
 
 <h1 align="center">
