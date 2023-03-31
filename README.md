@@ -11,7 +11,7 @@ An Odoo Integration for Seerbit POS Terminal
 </h2>
 
 ## How to Use
-A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/seerbit/)
+A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_seerbit/)
 
 ## Version History
 ## **[0.0.1]** 30/03/2023
