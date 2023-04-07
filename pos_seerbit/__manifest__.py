@@ -9,7 +9,6 @@
     'data': [
         'data/account_journal.xml',
         'data/pos.payment.method.csv',
-        'views/res_config_settings_views.xml',
         'views/pos_payment_method_views.xml',
     ],
     'depends': ['point_of_sale'],
@@ -17,6 +16,9 @@
     'assets': {
         'point_of_sale.assets': [
             'pos_seerbit/static/src/**/*',
+        ],
+        'web.assets_qweb': [
+            'pos_seerbit/static/src/xml/**/*',
         ],
     },
     'license': 'OPL-1',

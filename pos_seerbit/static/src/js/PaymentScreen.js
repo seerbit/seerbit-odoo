@@ -3,11 +3,11 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
     const PaymentScreen = require('point_of_sale.PaymentScreen');
     const Registries = require('point_of_sale.Registries');
-    const { onMounted } = owl;
+    const { onMounted } = owl.hooks;
 
     const PosSeerbitPaymentScreen = PaymentScreen => class extends PaymentScreen {
-        setup() {
-        super.setup();
+        constructor() {
+            super(...arguments);
             onMounted(() => {
                 const pendingPaymentLine = this.currentOrder.paymentlines.find(
                     paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' &&

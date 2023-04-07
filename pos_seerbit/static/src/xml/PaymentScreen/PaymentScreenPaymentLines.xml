@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="SeerbitPaymentScreenPaymentLines" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[@class='paymentline']/div[@class='payment-amount']/t[@t-else='']" position="before">
+            <t t-elif="line and line.payment_status == 'waitingSeerbit'">
+                <t t-esc="env.pos.format_currency_no_symbol(line.get_amount())" />
+            </t>
+        </xpath>
+        <xpath expr="//div[@class='paymentline selected']/div[@class='payment-amount']/t[@t-else='']" position="before">
+            <t t-elif="line and line.payment_status == 'waitingSeerbit'">
+                <t t-esc="env.pos.format_currency_no_symbol(line.get_amount())" />
+            </t>
+        </xpath>
+    </t>
+</templates>
