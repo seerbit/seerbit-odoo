@@ -20,8 +20,6 @@ class PosSeerbitController(http.Controller):
     def notification(self):
         data = json.loads(http.request.httprequest.data)
         # Ignore unknown ill-formed data
-        print('notification received')
-        print(data)
         try:
             notification = data.get('notificationItems')[0]["notificationRequestItem"]
             # ignore none transaction notification
@@ -35,6 +33,7 @@ class PosSeerbitController(http.Controller):
                 if (notification["data"]["code"] == "00"):# and
                     #self.is_verified(notification)):
                     payment_method.seerbit_latest_response = json.dumps(notification)
+                    _logger.info('A payment notification has been saved')
                 else:
                     _logger.info('A non-approved notification received from seerbit:\n%s',
                                 pprint.pformat(data))
