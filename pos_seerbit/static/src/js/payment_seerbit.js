@@ -103,36 +103,30 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _poll_for_response: function (resolve, reject) {
             var self = this;
-            if (this.was_cancelled) {
+            if (this.was_cancelled || !this.pos.get_order().selected_paymentline) {
                 return resolve(true);
             }
+            const expect_val = self._seerbit_pay_data();
             return rpc.query({
                 model: 'pos.payment.method',
                 method: 'get_latest_seerbit_status',
-                args: [[this.payment_method.id]],
+                args: [[this.payment_method.id], expect_val],
             }, {
                 timeout: 3000,
                 shadow: true,
             }).then(function (status) {
+                console.log(status);
                 var notification = status.latest_response;
                 var line = self.pending_seerbit_line();
                 if (line) {
                     if (line.payment_status == 'done') {
                     } else if (notification) {
-                        // A notification has been received with matching public key
-                        var expect_val = self._seerbit_pay_data();
-                        if (expect_val.Currency == notification.data.currency &&
-                            parseFloat(expect_val.RequestedAmount.toFixed(2)) == notification.data.amount) {
-                            // Only proceed when currency and amount tallies
-                            line.set_receipt_info('Session ID: ' + notification.data.reference);
-                            line.transaction_id = notification.data.reference;
-                            line.card_type = notification.data.channelType;
-                            line.cardholder_name = notification.data.fullname;
-                            resolve(true);
-                        }
-                        else {
-                            console.log('Mismatch Payment Received');
-                        }
+                        // A matching payment has been received
+                        line.set_receipt_info('Session ID: ' + notification.data.reference);
+                        line.transaction_id = notification.data.reference;
+                        line.card_type = notification.data.channelType;
+                        line.cardholder_name = notification.data.fullname;
+                        resolve(true);
                     } else {
                         line.set_payment_status('waitingSeerbit');
                     }
@@ -148,7 +142,8 @@ odoo.define('pos_seerbit.payment', function (require) {
                 if (line) {
                     line.set_payment_status('errorSeerbit');
                 };
-                return reject(this._show_error(_t('Could not connect to the Odoo server, please check your internet connection and try again.'),
+                return reject(this._show_error(
+                    _t('Could not connect to the Odoo server, please check your internet connection and try again.'),
                     'Odoo Server Error'));
             });
         },

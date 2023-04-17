@@ -57,11 +57,14 @@ class PosPaymentMethod(models.Model):
         return super(PosPaymentMethod, self)._is_write_forbidden(fields - whitelisted_fields)
 
 
-    def get_latest_seerbit_status(self):
-        self.ensure_one
-        latest_response = self.sudo().seerbit_latest_response
-        self.sudo().seerbit_latest_response = '' # Avoid reusing responses
-        latest_response = json.loads(latest_response) if latest_response else False
-        return {
-            'latest_response': latest_response,
-        }
+    def get_latest_seerbit_status(self, expected):
+        self.ensure_one()
+        stored = self.sudo().seerbit_latest_response
+        if stored:
+            stored=json.loads(stored)
+            # A notification exists, we now have to compare with expected val
+            if (expected["Currency"] == stored['data']['currency'] and
+                round(float(expected['RequestedAmount']),2) == stored['data']['amount']):
+                self.sudo().seerbit_latest_response = '' # Avoid reusing responses
+                return {'latest_response': stored,}
+        return False
