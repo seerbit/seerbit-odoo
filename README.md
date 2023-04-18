@@ -14,9 +14,19 @@ An Odoo Integration for Seerbit POS Terminal
 A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_seerbit/)
 
 ## Version History
-## **[0.1.1]** 17/04/2023
+## **[0.1.2]** 18/04/2023
 ### Impacted Versions:
 - Odoo16 - 18/04/2023
+- Odoo15 - 18/04/2023
+### Changes:
+- Elimination of the need of Seerbit account `SECRET KEY`
+- Code refactoring
+
+
+## Version History
+## **[0.1.1]** 17/04/2023
+### Impacted Versions:
+- Odoo16 - 17/04/2023
 - Odoo15 - 17/04/2023
 ### Changes:
 - Moved payment matching logic to python layer

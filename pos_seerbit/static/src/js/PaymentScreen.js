@@ -15,7 +15,6 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                 );
                 if (pendingPaymentLine) {
                     const paymentTerminal = pendingPaymentLine.payment_method.payment_terminal;
-                    paymentTerminal.set_most_recent_service_id(pendingPaymentLine.terminalServiceId);
                     pendingPaymentLine.set_payment_status('waitingSeerbit');
                     paymentTerminal.start_get_status_polling().then(isPaymentSuccessful => {
                         if (isPaymentSuccessful) {

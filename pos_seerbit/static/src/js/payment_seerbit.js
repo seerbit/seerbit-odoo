@@ -22,10 +22,6 @@ odoo.define('pos_seerbit.payment', function (require) {
             this._super.apply(this, arguments);
         },
 
-        set_most_recent_service_id() {
-            this.most_recent_service_id = Math.floor(Math.random() * Math.pow(2, 64)).toString().substring(0, 10);
-        },
-
         pending_seerbit_line() {
             return this.pos.get_order().paymentlines.find(
                 paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' && (!paymentLine.is_done()));
@@ -38,24 +34,11 @@ odoo.define('pos_seerbit.payment', function (require) {
             clearTimeout(this.polling);
         },
 
-        _seerbit_get_sale_id: function () {
-            var config = this.pos.config;
-            return _.str.sprintf('%s (ID: %s)', config.display_name, config.id);
-        },
-
         _seerbit_pay_data: function () {
-            var order = this.pos.get_order();
-            var line = order.selected_paymentline;
-            var data = {
-                'TransactionID': order.uid,
-                'TimeStamp': moment().format(), // iso format: '2018-01-10T11:30:15+00:00'
+            return {
                 'Currency': this.pos.currency.name,
-                'RequestedAmount': line.amount,
-                'SaleID': this._seerbit_get_sale_id(),
-                'ServiceID': this.most_recent_service_id,
-                'POSID': this.payment_method.seerbit_terminal_identifier
+                'RequestedAmount': this.pos.get_order().selected_paymentline.amount,
             };
-            return data;
         },
 
         _seerbit_pay: function (cid) {
@@ -73,7 +56,6 @@ odoo.define('pos_seerbit.payment', function (require) {
             }
 
             var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
-            line.setTerminalServiceId(this.most_recent_service_id);
             line.set_payment_status('waitingSeerbit');
             return this.start_get_status_polling()
         },
@@ -91,7 +73,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 self._poll_for_response(resolve, reject);
                 self.polling = setInterval(function () {
                     self._poll_for_response(resolve, reject);
-                }, 5500);
+                }, 3500);
             });
 
             // make sure to stop polling when we're done
@@ -106,11 +88,10 @@ odoo.define('pos_seerbit.payment', function (require) {
             if (this.was_cancelled || !this.pos.get_order().selected_paymentline) {
                 return resolve(true);
             }
-            const expect_val = self._seerbit_pay_data();
             return rpc.query({
                 model: 'pos.payment.method',
                 method: 'get_latest_seerbit_status',
-                args: [[this.payment_method.id], expect_val],
+                args: [[this.payment_method.id], self._seerbit_pay_data()],
             }, {
                 timeout: 3000,
                 shadow: true,
@@ -135,16 +116,16 @@ odoo.define('pos_seerbit.payment', function (require) {
                     reject();
                 }
             }).catch(error => {
-
                 console.log(error);
-                console.log("rejecting");
                 let line = this.pending_seerbit_line();
                 if (line) {
                     line.set_payment_status('errorSeerbit');
                 };
-                return reject(this._show_error(
+                this._show_error(
                     _t('Could not connect to the Odoo server, please check your internet connection and try again.'),
-                    'Odoo Server Error'));
+                    'Odoo Server Error'
+                );
+                reject();
             });
         },
 
