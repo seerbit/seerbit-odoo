@@ -14,7 +14,7 @@
             </t>
             <t t-elif="props.line.payment_status == 'errorSeerbit'">
                 <div>
-                    Unreachable
+                    Error
                 </div>
                 <div class="button send_force_done dangerous"
                      title="Force Done"
