@@ -42,28 +42,25 @@ class ResConfigSettings(models.TransientModel):
     )
     
     # Firebase Configuration Fields (only shown when Seerbit is enabled)
+    # Note: These fields are not stored in the database but managed through ir.config_parameter
     seerbit_firebase_cred = fields.Char(
         string="Firebase Service Account JSON",
         help="Paste the content of your Firebase service account JSON file here.",
-        config_parameter='pos_seerbit.seerbit_firebase_cred',
         groups="base.group_erp_manager",
     )
     seerbit_firebase_db_url = fields.Char(
         string="Firebase Database URL",
         help="The URL of your Firebase Realtime Database.",
-        config_parameter='pos_seerbit.seerbit_firebase_db_url',
         groups="base.group_erp_manager",
     )
     seerbit_firebase_api_key = fields.Char(
         string="Firebase API Key",
         help="The API key for your Firebase project.",
-        config_parameter='pos_seerbit.seerbit_firebase_api_key',
         groups="base.group_erp_manager",
     )
     seerbit_firebase_project_id = fields.Char(
         string="Firebase Project ID",
         help="The Project ID of your Firebase project.",
-        config_parameter='pos_seerbit.seerbit_firebase_project_id',
         groups="base.group_erp_manager",
     )
 
@@ -89,7 +86,7 @@ class ResConfigSettings(models.TransientModel):
         """Save configuration values to system parameters"""
         super().set_values()
         
-        # Save Firebase configuration
+        # Save Firebase configuration to ir.config_parameter
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_cred', self.seerbit_firebase_cred or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_db_url', self.seerbit_firebase_db_url or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_api_key', self.seerbit_firebase_api_key or '')

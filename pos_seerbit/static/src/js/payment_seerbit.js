@@ -38,6 +38,8 @@ odoo.define('pos_seerbit.payment', function (require) {
                     // Update UI, clear localStorage, log
                     updatePaymentStatusUI(result.status, result.message);
                     localStorage.removeItem('pending_transaction');
+                    // Set flag for polling to detect completion
+                    localStorage.setItem('reconciliation_complete', 'true');
                     console.log('Reconciliation complete via RPC:', result);
                 }).catch(function(error) {
                     console.warn('RPC reconciliation failed:', error);
@@ -77,6 +79,12 @@ odoo.define('pos_seerbit.payment', function (require) {
     var PaymentSeerbit = PaymentInterface.extend({
         init: function() {
             this._super.apply(this, arguments);
+            this.polling = null;
+            this.was_cancelled = false;
+            this.supports_reversals = false; // Seerbit doesn't support reversals
+            
+            console.log('PaymentSeerbit initialized');
+            
             // Initialize Firebase when payment interface is created
             FirebaseInit.initializeFirebase().then(function(success) {
                 if (success) {
@@ -90,19 +98,72 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         send_payment_request: function (cid) {
+            console.log('PaymentSeerbit: send_payment_request called with cid:', cid);
             this._super.apply(this, arguments);
             this._reset_state();
             return this._seerbit_pay(cid);
         },
 
         send_payment_cancel: function (order, cid) {
+            console.log('PaymentSeerbit: send_payment_cancel called');
             this._super.apply(this, arguments);
             return this._seerbit_cancel();
         },
 
         close: function () {
+            console.log('PaymentSeerbit: close called');
             this._seerbit_cancel();
             this._super.apply(this, arguments);
+        },
+
+        // Add the missing start_get_status_polling method
+        start_get_status_polling: function() {
+            console.log('PaymentSeerbit: start_get_status_polling called');
+            return new Promise((resolve, reject) => {
+                const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
+                if (!pending) {
+                    console.log('No pending transaction found');
+                    resolve(false);
+                    return;
+                }
+
+                console.log('Starting polling for transaction:', pending.id);
+
+                // Set up polling to check for reconciliation
+                const checkStatus = () => {
+                    if (this.was_cancelled) {
+                        console.log('Polling cancelled');
+                        clearTimeout(this.polling);
+                        resolve(false);
+                        return;
+                    }
+
+                    // Check if reconciliation has occurred
+                    const reconciled = localStorage.getItem('reconciliation_complete');
+                    if (reconciled) {
+                        console.log('Reconciliation detected, stopping polling');
+                        clearTimeout(this.polling);
+                        localStorage.removeItem('reconciliation_complete');
+                        resolve(true);
+                        return;
+                    }
+
+                    // Continue polling every 2 seconds
+                    this.polling = setTimeout(checkStatus, 2000);
+                };
+
+                // Start polling
+                checkStatus();
+
+                // Set a timeout to stop polling after 5 minutes
+                setTimeout(() => {
+                    if (this.polling) {
+                        console.log('Polling timeout reached');
+                        clearTimeout(this.polling);
+                        resolve(false);
+                    }
+                }, 300000); // 5 minutes
+            });
         },
 
         pending_seerbit_line: function() {
@@ -140,6 +201,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             this.was_cancelled = false;
             if (this.polling) {
                 clearTimeout(this.polling);
+                this.polling = null;
             }
         },
 
@@ -213,7 +275,12 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _seerbit_cancel: function () {
-            this.was_cancelled = !!this.polling;
+            console.log('PaymentSeerbit: _seerbit_cancel called');
+            this.was_cancelled = true;
+            if (this.polling) {
+                clearTimeout(this.polling);
+                this.polling = null;
+            }
         },
 
         _show_error: function (msg, title) {
@@ -227,5 +294,6 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
     });
 
+    console.log('PaymentSeerbit class defined with methods:', Object.getOwnPropertyNames(PaymentSeerbit.prototype));
     return PaymentSeerbit;
 });

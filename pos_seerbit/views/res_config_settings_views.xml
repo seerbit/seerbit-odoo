@@ -41,7 +41,7 @@
                                 <div class="o_setting_left_pane"/>
                                 <div class="o_setting_right_pane">
                                     <label for="seerbit_firebase_cred" string="Firebase Service Account JSON"/>
-                                    <field name="seerbit_firebase_cred" widget="textarea" placeholder='{"type": "service_account", "project_id": "..."}'/>
+                                    <field name="seerbit_firebase_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
                                     <div class="text-muted mt8">
                                         Paste the entire content of your Firebase service account JSON file here.
                                     </div>
