@@ -7,8 +7,18 @@ odoo.define('pos_seerbit.payment', function (require) {
     const { Gui } = require('point_of_sale.Gui');
     var _t = core._t;
 
+    // Import Firebase initialization
+    var FirebaseInit = require('pos_seerbit.firebase_init');
+
     function listenForReconciliation(transactionId) {
-        const reconciliationsRef = window.firebaseDb.ref('reconciliations');
+        // Ensure Firebase is initialized
+        if (!FirebaseInit.isFirebaseAvailable()) {
+            console.warn('Firebase not available for reconciliation');
+            return;
+        }
+
+        const firebaseDb = FirebaseInit.getFirebaseDb();
+        const reconciliationsRef = firebaseDb.ref('reconciliations');
         reconciliationsRef.on('child_added', function(snapshot) {
             const data = snapshot.val();
             const pending = JSON.parse(localStorage.getItem('pending_transaction'));
@@ -58,6 +68,18 @@ odoo.define('pos_seerbit.payment', function (require) {
     }
 
     var PaymentSeerbit = PaymentInterface.extend({
+        init: function() {
+            this._super.apply(this, arguments);
+            // Initialize Firebase when payment interface is created
+            FirebaseInit.initializeFirebase().then(function(success) {
+                if (success) {
+                    console.log('Firebase initialized for Seerbit payments');
+                } else {
+                    console.warn('Firebase initialization failed for Seerbit payments');
+                }
+            });
+        },
+
         send_payment_request: function (cid) {
             this._super.apply(this, arguments);
             this._reset_state();

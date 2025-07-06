@@ -17,6 +17,10 @@
     "installable": True,
     "assets": {
         "point_of_sale.assets": [
+            # Firebase SDK
+            ("include", "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"),
+            ("include", "https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"),
+            # Seerbit assets
             "pos_seerbit/static/src/**/*",
         ],
     },
