@@ -12,8 +12,7 @@ odoo.define('pos_seerbit.payment', function (require) {
         reconciliationsRef.on('child_added', function(snapshot) {
             const data = snapshot.val();
             const pending = JSON.parse(localStorage.getItem('pending_transaction'));
-            if (pending && data.id === pending.id) {
-                // Try RPC first, fall back to webhook if it fails
+            if (pending && (data.id === pending.id || data.erpTransactionRef === pending.erpTransactionRef)) {
                 rpc.query({
                     model: 'pos.payment.method',
                     method: 'reconcile_payment',
@@ -78,6 +77,22 @@ odoo.define('pos_seerbit.payment', function (require) {
                 paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' && (!paymentLine.is_done()));
         },
 
+        // Trigger handlers for UI buttons
+        send_force_done: function (line) {
+            // Force mark payment as done (for manual override)
+            line.set_payment_status('done');
+            line.set_payment_status('done');
+            this._show_error(_t('Payment manually confirmed.'), _t('Manual Override'));
+        },
+
+        send_payment_request: function (line) {
+            // Retry sending payment request
+            const order = this.pos.get_order();
+            const cid = line.cid;
+            this._reset_state();
+            return this._seerbit_pay(cid);
+        },
+
         // private methods
         _reset_state: function () {
             this.was_cancelled = false;
@@ -124,6 +139,9 @@ odoo.define('pos_seerbit.payment', function (require) {
                 var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
                 line.set_payment_status('waitingSeerbit');
             }).catch((error) => {
+                // Set error status for retry button
+                var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
+                line.set_payment_status('errorSeerbit');
                 this._show_error(_t('Could not send payment request.'), 'Seerbit Error');
                 console.error(error);
             });
