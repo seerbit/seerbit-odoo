@@ -1,6 +1,6 @@
 """
 Tests for configuration management.
-These tests verify that environment variables are loaded correctly.
+These tests verify that settings-based configuration works correctly.
 """
 
 import json
@@ -10,158 +10,136 @@ import tempfile
 import pytest
 
 
-def test_get_env_var_with_default():
-    """Test getting environment variable with default value"""
-    # Test with non-existent variable
-    from pos_seerbit.config import get_env_var
-    result = get_env_var('NON_EXISTENT_VAR', 'default_value')
-    assert result == 'default_value'
+def test_get_firebase_config_for_frontend(env):
+    """Test getting Firebase config for frontend from settings"""
+    # Set up test configuration
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_api_key', 'test-api-key')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
+    config_param.set_param('pos_seerbit.seerbit_firebase_project_id', 'test-project-id')
+
+    # Get config from settings
+    settings = env['res.config.settings'].sudo()
+    config = settings.get_firebase_config_for_frontend()
+
+    assert config['apiKey'] == 'test-api-key'
+    assert config['databaseURL'] == 'https://test-project.firebaseio.com'
+    assert config['projectId'] == 'test-project-id'
 
 
-def test_get_env_var_with_actual_value():
-    """Test getting environment variable with actual value"""
-    from pos_seerbit.config import get_env_var
+def test_get_firebase_config_for_backend(env):
+    """Test getting Firebase config for backend from settings"""
+    # Set up test configuration
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_cred', '{"type": "service_account"}')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
 
-    # Set a test environment variable
-    os.environ['TEST_VAR'] = 'test_value'
-    try:
-        result = get_env_var('TEST_VAR', 'default_value')
-        assert result == 'test_value'
-    finally:
-        # Clean up
-        del os.environ['TEST_VAR']
+    # Get config from settings
+    settings = env['res.config.settings'].sudo()
+    config = settings.get_firebase_config_for_backend()
 
-
-def test_get_env_var_required():
-    """Test getting required environment variable"""
-    from pos_seerbit.config import get_env_var
-
-    # Test that it raises ValueError when required but not set
-    with pytest.raises(ValueError):
-        get_env_var('REQUIRED_VAR', required=True)
+    assert config['credJson'] == '{"type": "service_account"}'
+    assert config['databaseURL'] == 'https://test-project.firebaseio.com'
 
 
-def test_seerbit_config_defaults():
-    """Test that SeerbitConfig has default values"""
-    from pos_seerbit.config import SeerbitConfig
+def test_validate_firebase_config_success(env):
+    """Test Firebase config validation with valid config"""
+    # Set up valid configuration
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_cred', '{"type": "service_account", "project_id": "test"}')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
 
-    # Test that default values are set
-    assert SeerbitConfig.FIREBASE_CRED_PATH == 'service-account-write.json'
-    assert SeerbitConfig.FIREBASE_DB_URL == 'https://your-firebase-db.firebaseio.com'
-    assert SeerbitConfig.FIREBASE_API_KEY == 'YOUR_READONLY_API_KEY'
-    assert SeerbitConfig.FIREBASE_DATABASE_URL == 'YOUR_DATABASE_URL'
-    assert SeerbitConfig.FIREBASE_PROJECT_ID == 'YOUR_PROJECT_ID'
+    # Validate config
+    settings = env['res.config.settings'].sudo()
+    result = settings.validate_firebase_config()
 
-
-def test_firebase_config_for_frontend():
-    """Test getting Firebase config for frontend"""
-    from pos_seerbit.config import SeerbitConfig
-
-    config = SeerbitConfig.get_firebase_config_for_frontend()
-
-    assert 'apiKey' in config
-    assert 'databaseURL' in config
-    assert 'projectId' in config
-
-    assert config['apiKey'] == SeerbitConfig.FIREBASE_API_KEY
-    assert config['databaseURL'] == SeerbitConfig.FIREBASE_DATABASE_URL
-    assert config['projectId'] == SeerbitConfig.FIREBASE_PROJECT_ID
+    assert result['status'] == 'success'
+    assert 'valid' in result['message']
 
 
-def test_firebase_config_for_backend():
-    """Test getting Firebase config for backend"""
-    from pos_seerbit.config import SeerbitConfig
+def test_validate_firebase_config_missing_cred(env):
+    """Test Firebase config validation with missing credentials"""
+    # Set up configuration with missing credentials
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_cred', '')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
 
-    config = SeerbitConfig.get_firebase_config_for_backend()
+    # Validate config
+    settings = env['res.config.settings'].sudo()
+    result = settings.validate_firebase_config()
 
-    assert 'credPath' in config
-    assert 'databaseURL' in config
-
-    assert config['credPath'] == SeerbitConfig.FIREBASE_CRED_PATH
-    assert config['databaseURL'] == SeerbitConfig.FIREBASE_DB_URL
-
-
-def test_config_validation_with_defaults():
-    """Test config validation with default values (should fail)"""
-    from pos_seerbit.config import SeerbitConfig
-
-    # With default values, validation should fail
-    with pytest.raises(ValueError) as exc_info:
-        SeerbitConfig.validate_config()
-
-    assert "Missing or invalid configuration" in str(exc_info.value)
+    assert result['status'] == 'error'
+    assert 'required' in result['message']
 
 
-def test_config_validation_with_real_values():
-    """Test config validation with real values"""
-    from pos_seerbit.config import SeerbitConfig
+def test_validate_firebase_config_invalid_json(env):
+    """Test Firebase config validation with invalid JSON"""
+    # Set up configuration with invalid JSON
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_cred', 'invalid json')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
 
-    # Set real values temporarily
-    original_values = {
-        'FIREBASE_DB_URL': SeerbitConfig.FIREBASE_DB_URL,
-        'FIREBASE_API_KEY': SeerbitConfig.FIREBASE_API_KEY,
-        'FIREBASE_DATABASE_URL': SeerbitConfig.FIREBASE_DATABASE_URL,
-        'FIREBASE_PROJECT_ID': SeerbitConfig.FIREBASE_PROJECT_ID,
-    }
+    # Validate config
+    settings = env['res.config.settings'].sudo()
+    result = settings.validate_firebase_config()
 
-    try:
-        # Set real values
-        os.environ['FIREBASE_DB_URL'] = 'https://real-project.firebaseio.com'
-        os.environ['FIREBASE_API_KEY'] = 'real-api-key'
-        os.environ['FIREBASE_DATABASE_URL'] = 'https://real-project.firebaseio.com'
-        os.environ['FIREBASE_PROJECT_ID'] = 'real-project-id'
-
-        # Reload config
-        from importlib import reload
-
-        import pos_seerbit.config
-        reload(pos_seerbit.config)
-
-        # Validation should pass
-        pos_seerbit.config.SeerbitConfig.validate_config()
-
-    finally:
-        # Restore original values
-        for key, value in original_values.items():
-            if key in os.environ:
-                del os.environ[key]
-
-        # Reload config to restore defaults
-        from importlib import reload
-
-        import pos_seerbit.config
-        reload(pos_seerbit.config)
+    assert result['status'] == 'error'
+    assert 'Invalid JSON format' in result['message']
 
 
-def test_env_file_loading():
-    """Test loading configuration from .env file"""
-    from pos_seerbit.config import get_env_var
+def test_payment_method_get_firebase_config(env):
+    """Test getting Firebase config from payment method"""
+    # Set up test configuration
+    config_param = env['ir.config_parameter'].sudo()
+    config_param.set_param('pos_seerbit.seerbit_firebase_api_key', 'test-api-key')
+    config_param.set_param('pos_seerbit.seerbit_firebase_db_url', 'https://test-project.firebaseio.com')
+    config_param.set_param('pos_seerbit.seerbit_firebase_project_id', 'test-project-id')
 
-    # Create a temporary .env file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
-        f.write("TEST_VAR_FROM_FILE=file_value\n")
-        f.write("ANOTHER_VAR=another_value\n")
-        env_file = f.name
+    # Get config from payment method
+    payment_method = env['pos.payment.method'].sudo()
+    config = payment_method.get_firebase_config()
 
-    try:
-        # Load the .env file
-        from dotenv import load_dotenv
-        load_dotenv(env_file)
+    assert config['apiKey'] == 'test-api-key'
+    assert config['databaseURL'] == 'https://test-project.firebaseio.com'
+    assert config['projectId'] == 'test-project-id'
 
-        # Test that variables are loaded
-        result = get_env_var('TEST_VAR_FROM_FILE', 'default')
-        assert result == 'file_value'
 
-        result = get_env_var('ANOTHER_VAR', 'default')
-        assert result == 'another_value'
+def test_settings_save_and_load(env):
+    """Test that settings are properly saved and loaded"""
+    # Create settings record
+    settings = env['res.config.settings'].sudo().create({
+        'seerbit_firebase_api_key': 'test-api-key',
+        'seerbit_firebase_db_url': 'https://test-project.firebaseio.com',
+        'seerbit_firebase_project_id': 'test-project-id',
+        'seerbit_firebase_cred': '{"type": "service_account"}',
+    })
 
-    except ImportError:
-        # python-dotenv not installed, skip this test
-        pytest.skip("python-dotenv not installed")
-    finally:
-        # Clean up
-        os.unlink(env_file)
-        if 'TEST_VAR_FROM_FILE' in os.environ:
-            del os.environ['TEST_VAR_FROM_FILE']
-        if 'ANOTHER_VAR' in os.environ:
-            del os.environ['ANOTHER_VAR']
+    # Save settings
+    settings.set_values()
+
+    # Load settings
+    loaded_settings = env['res.config.settings'].sudo().create({})
+    values = loaded_settings.get_values()
+
+    assert values['seerbit_firebase_api_key'] == 'test-api-key'
+    assert values['seerbit_firebase_db_url'] == 'https://test-project.firebaseio.com'
+    assert values['seerbit_firebase_project_id'] == 'test-project-id'
+    assert values['seerbit_firebase_cred'] == '{"type": "service_account"}'
+
+
+def test_configuration_constraints(env):
+    """Test configuration constraints validation"""
+    settings = env['res.config.settings'].sudo().create({
+        'module_pos_seerbit': True,
+        'seerbit_firebase_cred': 'invalid json',
+        'seerbit_firebase_db_url': 'http://invalid-url.com',
+    })
+
+    # Test validation constraints
+    with pytest.raises(Exception) as exc_info:
+        settings._validate_firebase_cred()
+    assert 'Invalid JSON format' in str(exc_info.value)
+
+    with pytest.raises(Exception) as exc_info:
+        settings._validate_firebase_db_url()
+    assert "must start with 'https://'" in str(exc_info.value)
