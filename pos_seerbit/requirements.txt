@@ -1,5 +1,10 @@
 # Firebase Admin SDK for Python
-firebase-admin>=6.0.0
+firebase-admin>=6.0.0,<7.0.0
  
 # Additional dependencies for Seerbit module
-requests>=2.25.0 
+requests>=2.25.0,<3.0.0
+
+# Odoo 16 compatibility
+# These are typically included with Odoo but listed for clarity
+# werkzeug>=2.0.0
+# jinja2>=3.0.0 

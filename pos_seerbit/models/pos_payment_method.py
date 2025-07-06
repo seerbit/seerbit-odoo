@@ -133,13 +133,17 @@ class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
     def _get_payment_terminal_selection(self):
-        return super(PosPaymentMethod, self)._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
+        return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
 
     # Seerbit Fields
     seerbit_public_key = fields.Char(
-        string="Seerbit Public Key", help="As provided on Seerbit dashboard", copy=False)
+        string="Seerbit Public Key", 
+        help="As provided on Seerbit dashboard", 
+        copy=False
+    )
     seerbit_latest_response = fields.Char(
-        copy=False, groups="base.group_erp_manager"
+        copy=False, 
+        groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
     @api.constrains("seerbit_public_key")
@@ -162,7 +166,7 @@ class PosPaymentMethod(models.Model):
 
     def _is_write_forbidden(self, fields):
         whitelisted_fields = {"seerbit_latest_response"}
-        return super(PosPaymentMethod, self)._is_write_forbidden(fields - whitelisted_fields)
+        return super()._is_write_forbidden(fields - whitelisted_fields)
 
     @staticmethod
     def _format_erp_ref(ref):

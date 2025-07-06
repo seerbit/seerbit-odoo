@@ -42,7 +42,7 @@ class ResConfigSettings(models.TransientModel):
     )
     
     # Firebase Configuration Fields (only shown when Seerbit is enabled)
-    seerbit_firebase_cred = fields.Text(
+    seerbit_firebase_cred = fields.Char(
         string="Firebase Service Account JSON",
         help="Paste the content of your Firebase service account JSON file here.",
         config_parameter='pos_seerbit.seerbit_firebase_cred',
@@ -87,7 +87,7 @@ class ResConfigSettings(models.TransientModel):
 
     def set_values(self):
         """Save configuration values to system parameters"""
-        super(ResConfigSettings, self).set_values()
+        super().set_values()
         
         # Save Firebase configuration
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_cred', self.seerbit_firebase_cred or '')
@@ -103,7 +103,7 @@ class ResConfigSettings(models.TransientModel):
 
     def get_values(self):
         """Load configuration values from system parameters"""
-        res = super(ResConfigSettings, self).get_values()
+        res = super().get_values()
         res.update(
             seerbit_firebase_cred=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_cred', default=''),
             seerbit_firebase_db_url=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_db_url', default=''),
