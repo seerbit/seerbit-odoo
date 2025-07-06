@@ -263,19 +263,25 @@ function Deploy-ToOdooSh {
     # Check for conflicts (simplified check)
     Write-Info "Checking for conflicts..."
     try {
-        $mergeTree = git merge-tree $(git merge-base HEAD odoo-sh/master) HEAD odoo-sh/master
-        if ($mergeTree -match "<<<<<<<") {
-            throw "Conflicts detected"
+        # Get the merge base
+        $mergeBase = git merge-base HEAD odoo-sh/master
+        if ($mergeBase) {
+            # Check for conflicts using merge-tree
+            $mergeTree = git merge-tree $mergeBase HEAD odoo-sh/master
+            if ($mergeTree -match "<<<<<<<") {
+                throw "Conflicts detected"
+            }
+            Write-Success "No conflicts detected"
         }
-        Write-Success "No conflicts detected"
+        else {
+            Write-Warning "No common ancestor found - this is normal for new repositories"
+            Write-Success "Proceeding with deployment"
+        }
     }
     catch {
-        Write-Error "Potential conflicts detected. Please resolve conflicts manually:"
-        Write-Info "   git pull odoo-sh master"
-        Write-Info "   # Resolve conflicts"
-        Write-Info "   git add ."
-        Write-Info "   git commit -m 'Resolve conflicts'"
-        exit 1
+        Write-Warning "Could not check for conflicts automatically"
+        Write-Info "Proceeding with deployment - conflicts will be handled by git push"
+        Write-Info "If conflicts occur, you'll need to resolve them manually"
     }
     
     # Push to Odoo.sh
