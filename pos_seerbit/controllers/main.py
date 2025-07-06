@@ -6,8 +6,6 @@ from odoo import http
 from odoo.http import Response, request
 from werkzeug.exceptions import Forbidden
 
-from ..config import config
-
 _logger = logging.getLogger(__name__)
 
 
@@ -61,7 +59,7 @@ class SeerbitController(http.Controller):
                                 transaction_id, result.get('message', ''))
 
             return result
-
+        
         except Exception as e:
             _logger.error(
                 "Error processing reconciliation notification: %s", str(e))
@@ -74,8 +72,9 @@ class SeerbitController(http.Controller):
         This endpoint provides configuration data to the frontend.
         """
         try:
+            # Get Firebase configuration from settings
             config_data = {
-                'firebase_config': config.get_firebase_config_for_frontend()
+                'firebase_config': request.env['res.config.settings'].sudo().get_firebase_config_for_frontend()
             }
             return Response(
                 json.dumps(config_data),
@@ -89,3 +88,16 @@ class SeerbitController(http.Controller):
                 content_type='application/json',
                 status=500
             )
+
+    @http.route('/pos_seerbit/validate_config', type='json', auth='user', methods=['POST'])
+    def validate_config(self):
+        """
+        Validate Firebase configuration.
+        This endpoint validates the current Firebase configuration.
+        """
+        try:
+            result = request.env['res.config.settings'].sudo().validate_firebase_config()
+            return result
+        except Exception as e:
+            _logger.error("Error validating configuration: %s", str(e))
+            return {'status': 'error', 'message': f'Validation error: {str(e)}'}

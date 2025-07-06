@@ -5,63 +5,114 @@ import pprint
 import random
 import string
 import warnings
+import sys
 
-import firebase_admin
-from firebase_admin import credentials, db
+# Suppress all warnings from firebase_admin before importing
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+# Suppress specific firebase_admin warnings
+if 'firebase_admin' in sys.modules:
+    warnings.filterwarnings("ignore", module="firebase_admin")
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, db
+    FIREBASE_AVAILABLE = True
+except ImportError as e:
+    FIREBASE_AVAILABLE = False
+    firebase_admin = None
+    credentials = None
+    db = None
+    logging.getLogger(__name__).warning("Firebase Admin SDK not available: %s", str(e))
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from werkzeug.exceptions import Forbidden
 
-from ..config import config
-from ..utils import format_erp_ref
-
-# Suppress Firebase SyntaxWarning
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="firebase_admin")
+from odoo.addons.pos_seerbit.utils import format_erp_ref
 
 _logger = logging.getLogger(__name__)
 
 # Initialize Firebase only once
 _firebase_initialized = False
 
-def initialize_firebase():
+def initialize_firebase(env):
     """Initialize Firebase with proper error handling"""
     global _firebase_initialized
-    
+
+    # Check if Firebase is available
+    if not FIREBASE_AVAILABLE:
+        _logger.warning("Firebase Admin SDK not available. Skipping initialization.")
+        return False
+
     if _firebase_initialized or firebase_admin._apps:
         return True
-    
+
     try:
-        # Check if configuration is available
-        if not config.FIREBASE_CRED_PATH or not config.FIREBASE_DB_URL:
-            _logger.warning("Firebase configuration not available. Skipping initialization.")
+        # Get Firebase config from Odoo settings
+        config = env['ir.config_parameter'].sudo()
+        cred_json = config.get_param('pos_seerbit.seerbit_firebase_cred')
+        db_url = config.get_param('pos_seerbit.seerbit_firebase_db_url')
+
+        if not cred_json or not db_url:
+            _logger.warning("Firebase configuration not available in settings. Skipping initialization.")
             return False
-        
-        # Check if service account file exists
+
+        # Validate JSON format
+        try:
+            json.loads(cred_json)
+        except json.JSONDecodeError:
+            _logger.error("Invalid JSON format in Firebase service account credentials")
+            return False
+
+        # Save credentials to a temporary file
+        import tempfile
         import os
-        if not os.path.exists(config.FIREBASE_CRED_PATH):
-            _logger.warning("Firebase service account file not found: %s", config.FIREBASE_CRED_PATH)
-            return False
-        
-        cred = credentials.Certificate(config.FIREBASE_CRED_PATH)
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': config.FIREBASE_DB_URL
-        })
-        _firebase_initialized = True
-        _logger.info("Firebase initialized successfully")
-        return True
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_cred_file:
+            temp_cred_file.write(cred_json)
+            cred_path = temp_cred_file.name
+
+        try:
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': db_url
+            })
+            _firebase_initialized = True
+            _logger.info("Firebase initialized successfully")
+            return True
+        finally:
+            # Clean up the temporary file
+            try:
+                os.unlink(cred_path)
+            except OSError:
+                pass  # File might already be deleted
+                
     except Exception as e:
         _logger.warning("Failed to initialize Firebase: %s", str(e))
         return False
 
 # Try to initialize Firebase on module load
-initialize_firebase()
+# Note: This will only work if the module is enabled and configured
+try:
+    # We need an environment to initialize Firebase
+    # This will be done when the first payment method is accessed
+    pass
+except Exception as e:
+    _logger.debug("Firebase initialization deferred: %s", str(e))
 
 
-def send_to_firebase_transactions(payload):
+def send_to_firebase_transactions(env, payload):
     """
     Send payment request to Firebase.
     """
-    if not initialize_firebase():
+    # Check if Firebase is available
+    if not FIREBASE_AVAILABLE:
+        _logger.warning("Firebase Admin SDK not available. Cannot send payment request.")
+        return False
+    
+    if not initialize_firebase(env):
         _logger.warning("Firebase not initialized. Cannot send payment request.")
         return False
     
@@ -90,7 +141,7 @@ class PosPaymentMethod(models.Model):
     seerbit_latest_response = fields.Char(
         copy=False, groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
-
+    
     @api.constrains("seerbit_public_key")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
@@ -102,7 +153,7 @@ class PosPaymentMethod(models.Model):
                                                    "=", payment_method.seerbit_public_key)],
                 limit=1,
             )
-
+        
             if existing_key:
                 raise ValidationError(
                     _("Seerbit key %s is already used on payment method %s.")
@@ -139,7 +190,7 @@ class PosPaymentMethod(models.Model):
         self.env.cr.commit()
         
         # Try to send to Firebase
-        firebase_success = send_to_firebase_transactions(payload)
+        firebase_success = send_to_firebase_transactions(self.env, payload)
         
         if firebase_success:
             _logger.info(
@@ -326,4 +377,4 @@ class PosPaymentMethod(models.Model):
         Returns:
             dict: Firebase configuration for frontend
         """
-        return config.get_firebase_config_for_frontend()
+        return self.env['res.config.settings'].sudo().get_firebase_config_for_frontend()

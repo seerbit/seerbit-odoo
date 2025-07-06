@@ -30,3 +30,4 @@ def format_erp_ref(ref):
         normalized = f'odoo_{normalized}'
 
     return normalized
+ 

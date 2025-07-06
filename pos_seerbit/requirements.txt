@@ -1,0 +1,5 @@
+# Firebase Admin SDK for Python
+firebase-admin>=6.0.0
+ 
+# Additional dependencies for Seerbit module
+requests>=2.25.0 

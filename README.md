@@ -78,65 +78,25 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 
 Firebase-based payment reconciliation for Odoo Point of Sale with Seerbit payment terminals.
 
-## 🚀 Odoo.sh Installation
+## 🚀 Configuration
 
-### Prerequisites
+After installing the module, you need to configure it from the Odoo settings.
 
-- Odoo.sh account with access to custom modules
-- Firebase project with Realtime Database
-- Seerbit merchant account
-- Git installed on your system
+1.  Go to **Settings > General Settings > Seerbit**.
+2.  Enable the **Seerbit Payment Terminal**.
+3.  Fill in the Firebase credentials:
+    *   **Firebase Service Account JSON**: Paste the content of your Firebase service account JSON file.
+    *   **Firebase Database URL**: The URL of your Firebase Realtime Database.
+    *   **Firebase API Key**: The API key for your Firebase project.
+    *   **Firebase Project ID**: The Project ID of your Firebase project.
+4.  Click **Save**.
 
-### Quick Deployment (Recommended)
+### Seerbit Setup
 
-#### Option 1: Python Script (Cross-platform)
-
-```bash
-python deploy-to-odoo-sh.py
-```
-
-#### Option 2: PowerShell (Windows)
-
-```powershell
-.\deploy-to-odoo-sh.ps1
-```
-
-#### Option 3: Batch File (Windows)
-
-```cmd
-deploy-to-odoo-sh.bat
-```
-
-#### Option 4: Manual Deployment
-
-```bash
-git clone https://github.com/your-username/seerbit-odoo.git
-cd seerbit-odoo
-git remote add odoo-sh https://github.com/odoo/your-odoo-sh-repo.git
-git push odoo-sh 16.0:master
-```
-
-### After Deployment
-
-- Configure environment variables in Odoo.sh (see ODOO_SH_DEPLOYMENT.md)
-- Upload your Firebase service account JSON
-- Install the module from Apps
-- Configure the payment method in Point of Sale
-
-### Configuration
-
-#### Firebase Setup
-
-1. Create a Firebase project
-2. Enable Realtime Database
-3. Get your firebase service account json for backend access
-4. Get API key for frontend access
-
-#### Seerbit Setup
-
-1. Get your public key from Seerbit dashboard
-2. Configure the public key in POS payment method (not via environment variables)
-3. Test payment flow
+1.  Get your public key from the Seerbit dashboard.
+2.  Go to **Point of Sale > Configuration > Payment Methods** and select your Seerbit payment method.
+3.  Paste the public key in the **Seerbit Public Key** field.
+4.  Test the payment flow.
 
 ### Development
 

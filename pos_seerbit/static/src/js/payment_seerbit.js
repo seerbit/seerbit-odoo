@@ -158,8 +158,8 @@ odoo.define('pos_seerbit.payment', function (require) {
                 // Start listening for reconciliation
                 listenForReconciliation(payload.id);
                 // Set UI to waiting
-                var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
-                line.set_payment_status('waitingSeerbit');
+            var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
+            line.set_payment_status('waitingSeerbit');
             }).catch((error) => {
                 // Set error status for retry button
                 var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);

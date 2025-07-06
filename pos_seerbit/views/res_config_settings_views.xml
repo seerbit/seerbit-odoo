@@ -1,25 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="res_config_view_form_inherit_pos_econduit" model="ir.ui.view">
-        <field name="name">res.config.form.inherit.pos.terminal</field>
-        <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form" />
-        <field name="arch" type="xml">
-            <div id="pos_payment_terminals_section" position="inside">
-                <div class="col-12 col-lg-6 o_setting_box"
-                    id="seerbit_payment_terminal_setting"
-                    title="The transactions are processed by Seerbit. Set your terminal credentials on the related payment method.">
-                    <div class="o_setting_left_pane">
-                        <field name="module_pos_seerbit" />
-                    </div>
-                    <div class="o_setting_right_pane">
-                        <label for="module_pos_seerbit" string="Seerbit" />
-                        <div class="text-muted">
-                            Accept payments with an Seerbit payment terminal
+    <data>
+        <record id="res_config_settings_view_form" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.pos.seerbit</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[hasclass('settings')]" position="inside">
+                    <div class="app_settings_block" data-string="Seerbit" string="Seerbit" data-key="pos_seerbit">
+                        <h2>Seerbit Configuration</h2>
+                        <div class="row mt16 o_settings_container">
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <field name="module_pos_seerbit"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <label for="module_pos_seerbit"/>
+                                    <div class="text-muted">
+                                        Enable Seerbit payment terminal integration.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
+                                <div class="o_setting_left_pane"/>
+                                <div class="o_setting_right_pane">
+                                    <label for="seerbit_firebase_db_url"/>
+                                    <field name="seerbit_firebase_db_url" placeholder="https://your-project.firebaseio.com"/>
+                                    <label for="seerbit_firebase_api_key"/>
+                                    <field name="seerbit_firebase_api_key" placeholder="AIzaSy..."/>
+                                    <label for="seerbit_firebase_project_id"/>
+                                    <field name="seerbit_firebase_project_id" placeholder="your-project-id"/>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
+                                <div class="o_setting_left_pane"/>
+                                <div class="o_setting_right_pane">
+                                    <label for="seerbit_firebase_cred"/>
+                                    <field name="seerbit_firebase_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
+                                    <div class="text-muted mt8">
+                                        Paste the entire content of your Firebase service account JSON file here.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </field>
-    </record>
+                </xpath>
+            </field>
+        </record>
+    </data>
 </odoo>

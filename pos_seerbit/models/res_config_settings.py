@@ -8,14 +8,16 @@ and automatically manages payment method configurations when the module is disab
 
 Key Features:
 - Module enable/disable toggle
+- Conditional Firebase configuration fields (only shown when Seerbit is enabled)
 - Automatic cleanup of Seerbit payment methods when module is disabled
 - Proper access rights handling
 - Comprehensive error handling and logging
 """
 
 import logging
-from odoo import fields, models
-from odoo.exceptions import AccessError
+import json
+from odoo import fields, models, api
+from odoo.exceptions import AccessError, ValidationError
 
 # Set up logging for this module
 _logger = logging.getLogger(__name__)
@@ -38,67 +40,138 @@ class ResConfigSettings(models.TransientModel):
                 When enabled, transactions will be processed and synced with your Seerbit POS Terminal.
                 Set your terminal credentials on the payment method configuration.""",
     )
+    
+    # Firebase Configuration Fields (only shown when Seerbit is enabled)
+    seerbit_firebase_cred = fields.Text(
+        string="Firebase Service Account JSON",
+        help="Paste the content of your Firebase service account JSON file here.",
+        config_parameter='pos_seerbit.seerbit_firebase_cred',
+        groups="base.group_erp_manager",
+    )
+    seerbit_firebase_db_url = fields.Char(
+        string="Firebase Database URL",
+        help="The URL of your Firebase Realtime Database.",
+        config_parameter='pos_seerbit.seerbit_firebase_db_url',
+        groups="base.group_erp_manager",
+    )
+    seerbit_firebase_api_key = fields.Char(
+        string="Firebase API Key",
+        help="The API key for your Firebase project.",
+        config_parameter='pos_seerbit.seerbit_firebase_api_key',
+        groups="base.group_erp_manager",
+    )
+    seerbit_firebase_project_id = fields.Char(
+        string="Firebase Project ID",
+        help="The Project ID of your Firebase project.",
+        config_parameter='pos_seerbit.seerbit_firebase_project_id',
+        groups="base.group_erp_manager",
+    )
+
+    @api.constrains('seerbit_firebase_cred')
+    def _validate_firebase_cred(self):
+        """Validate Firebase service account JSON"""
+        for record in self:
+            if record.seerbit_firebase_cred and record.module_pos_seerbit:
+                try:
+                    json.loads(record.seerbit_firebase_cred)
+                except json.JSONDecodeError:
+                    raise ValidationError("Invalid JSON format in Firebase Service Account JSON")
+
+    @api.constrains('seerbit_firebase_db_url')
+    def _validate_firebase_db_url(self):
+        """Validate Firebase database URL format"""
+        for record in self:
+            if record.seerbit_firebase_db_url and record.module_pos_seerbit:
+                if not record.seerbit_firebase_db_url.startswith('https://'):
+                    raise ValidationError("Firebase Database URL must start with 'https://'")
 
     def set_values(self):
-        """
-        Save configuration values and perform cleanup operations
-        
-        This method is called when the user saves the configuration settings.
-        It handles the logic for enabling/disabling the Seerbit module and
-        performs necessary cleanup operations.
-        
-        Key Operations:
-        1. Call parent set_values() to handle standard configuration
-        2. Check if Seerbit module is being disabled
-        3. If disabled, find and disable all Seerbit payment methods
-        4. Handle any access rights or other errors gracefully
-        """
-        # Call parent method to handle standard configuration saving
+        """Save configuration values to system parameters"""
         super(ResConfigSettings, self).set_values()
         
-        # Check if the Seerbit module is being disabled
-        # We use sudo() to bypass access restrictions when reading config parameters
-        module_enabled = self.env["ir.config_parameter"].sudo().get_param("pos_seerbit.module_pos_seerbit")
+        # Save Firebase configuration
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_cred', self.seerbit_firebase_cred or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_db_url', self.seerbit_firebase_db_url or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_api_key', self.seerbit_firebase_api_key or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_project_id', self.seerbit_firebase_project_id or '')
         
-        if not module_enabled:
-            # Module is being disabled, perform cleanup operations
+        # Log configuration changes
+        if self.module_pos_seerbit:
+            _logger.info("Seerbit module enabled with Firebase configuration")
+        else:
+            _logger.info("Seerbit module disabled")
+
+    def get_values(self):
+        """Load configuration values from system parameters"""
+        res = super(ResConfigSettings, self).get_values()
+        res.update(
+            seerbit_firebase_cred=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_cred', default=''),
+            seerbit_firebase_db_url=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_db_url', default=''),
+            seerbit_firebase_api_key=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_api_key', default=''),
+            seerbit_firebase_project_id=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_project_id', default=''),
+        )
+        return res
+
+    @api.model
+    def get_firebase_config_for_frontend(self):
+        """
+        Get Firebase configuration for frontend use.
+        This method is called by the frontend to get the Firebase config.
+        
+        Returns:
+            dict: Firebase configuration for frontend
+        """
+        config = self.env['ir.config_parameter'].sudo()
+        return {
+            'apiKey': config.get_param('pos_seerbit.seerbit_firebase_api_key', default=''),
+            'databaseURL': config.get_param('pos_seerbit.seerbit_firebase_db_url', default=''),
+            'projectId': config.get_param('pos_seerbit.seerbit_firebase_project_id', default=''),
+        }
+
+    @api.model
+    def get_firebase_config_for_backend(self):
+        """
+        Get Firebase configuration for backend use.
+        This method is called by the backend to get the Firebase config.
+        
+        Returns:
+            dict: Firebase configuration for backend
+        """
+        config = self.env['ir.config_parameter'].sudo()
+        return {
+            'credJson': config.get_param('pos_seerbit.seerbit_firebase_cred', default=''),
+            'databaseURL': config.get_param('pos_seerbit.seerbit_firebase_db_url', default=''),
+        }
+
+    @api.model
+    def validate_firebase_config(self):
+        """
+        Validate Firebase configuration.
+        
+        Returns:
+            dict: Validation result with status and message
+        """
+        try:
+            config = self.get_firebase_config_for_backend()
+            
+            if not config['credJson']:
+                return {'status': 'error', 'message': 'Firebase Service Account JSON is required'}
+            
+            if not config['databaseURL']:
+                return {'status': 'error', 'message': 'Firebase Database URL is required'}
+            
+            # Validate JSON format
             try:
-                # Use sudo() to bypass access rights for system operations
-                # This ensures the cleanup can happen even if the current user
-                # doesn't have full access to payment methods
-                payment_methods = self.env["pos.payment.method"].sudo()
-                
-                # Search for all payment methods that use Seerbit terminal
-                seerbit_methods = payment_methods.search([
-                    ("use_payment_terminal", "=", "seerbit")
-                ])
-                
-                # If we found any Seerbit payment methods, disable them
-                if seerbit_methods:
-                    # Disable the Seerbit terminal for all found payment methods
-                    seerbit_methods.write({"use_payment_terminal": False})
-                    
-                    # Log the cleanup operation for debugging
-                    _logger.info(
-                        "Disabled Seerbit payment terminal for %d payment methods: %s",
-                        len(seerbit_methods),
-                        ", ".join(seerbit_methods.mapped('name'))
-                    )
-                else:
-                    _logger.info("No Seerbit payment methods found to disable")
-                    
-            except AccessError as e:
-                # Handle access rights errors gracefully
-                # This can happen if the user doesn't have permission to modify payment methods
-                _logger.warning(
-                    "Could not disable Seerbit payment methods due to access rights: %s",
-                    str(e)
-                )
-                
-            except Exception as e:
-                # Handle any other unexpected errors
-                # This ensures the configuration save doesn't fail due to cleanup issues
-                _logger.error(
-                    "Error disabling Seerbit payment methods: %s",
-                    str(e)
-                )
+                json.loads(config['credJson'])
+            except json.JSONDecodeError:
+                return {'status': 'error', 'message': 'Invalid JSON format in Firebase Service Account JSON'}
+            
+            # Validate URL format
+            if not config['databaseURL'].startswith('https://'):
+                return {'status': 'error', 'message': 'Firebase Database URL must start with https://'}
+            
+            return {'status': 'success', 'message': 'Firebase configuration is valid'}
+            
+        except Exception as e:
+            _logger.error("Error validating Firebase configuration: %s", str(e))
+            return {'status': 'error', 'message': f'Validation error: {str(e)}'}
