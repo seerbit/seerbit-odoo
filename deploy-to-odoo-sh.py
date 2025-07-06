@@ -232,6 +232,34 @@ def deploy_to_odoo_sh():
     print_info("Fetching latest from Odoo.sh...")
     run_command("git fetch odoo-sh")
 
+    # Check if we need to pull remote changes first
+    print_info("Checking if remote has changes...")
+    try:
+        # Check if local is behind remote
+        result = run_command(
+            "git rev-list --count HEAD..odoo-sh/master", capture_output=True)
+        behind_count = int(result.stdout.strip())
+
+        if behind_count > 0:
+            print_warning(
+                f"Local branch is {behind_count} commits behind remote")
+            print_info("Pulling remote changes to sync...")
+
+            # Try to pull with rebase first
+            try:
+                run_command("git pull --rebase odoo-sh master")
+                print_success("Successfully rebased with remote changes")
+            except:
+                print_warning("Rebase failed, trying merge...")
+                run_command("git pull odoo-sh master")
+                print_success("Successfully merged with remote changes")
+        else:
+            print_success("Local branch is up to date")
+
+    except:
+        print_warning(
+            "Could not determine branch status, proceeding with push")
+
     # Check for conflicts (simplified check)
     print_info("Checking for conflicts...")
     try:

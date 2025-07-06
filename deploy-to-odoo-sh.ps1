@@ -256,10 +256,39 @@ function Prepare-Deployment {
 function Deploy-ToOdooSh {
     Write-Header "Deploying to Odoo.sh"
     
-    # Fetch latest from Odoo.sh
+        # Fetch latest from Odoo.sh
     Write-Info "Fetching latest from Odoo.sh..."
     git fetch odoo-sh
-    
+
+    # Check if we need to pull remote changes first
+    Write-Info "Checking if remote has changes..."
+    try {
+        # Check if local is behind remote
+        $behindCount = git rev-list --count HEAD..odoo-sh/master
+        
+        if ([int]$behindCount -gt 0) {
+            Write-Warning "Local branch is $behindCount commits behind remote"
+            Write-Info "Pulling remote changes to sync..."
+            
+            # Try to pull with rebase first
+            try {
+                git pull --rebase odoo-sh master
+                Write-Success "Successfully rebased with remote changes"
+            }
+            catch {
+                Write-Warning "Rebase failed, trying merge..."
+                git pull odoo-sh master
+                Write-Success "Successfully merged with remote changes"
+            }
+        }
+        else {
+            Write-Success "Local branch is up to date"
+        }
+    }
+    catch {
+        Write-Warning "Could not determine branch status, proceeding with push"
+    }
+
     # Check for conflicts (simplified check)
     Write-Info "Checking for conflicts..."
     try {
