@@ -4,6 +4,7 @@
 
 <h1 align="center">
     <a href="https://apps.odoo.com/apps/modules/16.0/pos_seerbit/">
+<<<<<<< HEAD
     Seerbit Odoo Point of Sale</a><br/>
 </h1>
 <h2 align="center">
@@ -22,6 +23,20 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 
 ## **[0.1.3]** 07/07/2025
 
+=======
+  POS SEERBIT</a><br/>
+  
+</h1>
+<h2 align="center">
+An Odoo Integration for Seerbit POS Terminal
+</h2>
+
+## How to Use
+A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/seerbit/)
+
+## Version History
+## **[0.0.1]** 30/03/2023
+>>>>>>> 298efba (ReadMe Update)
 ### Impacted Versions:
 
 - Odoo16 - 18/04/2023
