@@ -1,6 +1,11 @@
-# Firebase Admin SDK for Python
-google-cloud-firestore>=2.11.0
-google-auth>=2.17.0
+# Seerbit Odoo POS Integration Dependencies
+# Compatible with Odoo 16 and Odoo.sh environment
 
-# Additional dependencies for Seerbit module
-requests>=2.25.0,<3.0.0
+# Firebase/Firestore Dependencies
+firebase-admin>=2.0.0
+google-cloud-firestore>=2.0.0
+google-auth>=2.0.0
+
+# Additional Google Cloud dependencies (optional but recommended)
+google-cloud-core>=2.0.0
+google-api-core>=2.0.0
