@@ -134,6 +134,36 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                 return super.send_force_done(line);
             }
         }
+
+        // Override to prevent standard payment terminal UI for Seerbit
+        show_payment_terminal_ui(line) {
+            console.log('show_payment_terminal_ui called for line:', line);
+            
+            // Check if this is a Seerbit payment
+            if (line?.payment_method?.use_payment_terminal === 'seerbit') {
+                console.log('Preventing standard payment terminal UI for Seerbit');
+                // Return false to prevent standard UI
+                return false;
+            } else {
+                // Call the original method for non-Seerbit payments
+                return super.show_payment_terminal_ui(line);
+            }
+        }
+
+        // Override to prevent standard payment terminal status for Seerbit
+        show_payment_terminal_status(line, status) {
+            console.log('show_payment_terminal_status called for line:', line, 'status:', status);
+            
+            // Check if this is a Seerbit payment
+            if (line?.payment_method?.use_payment_terminal === 'seerbit') {
+                console.log('Preventing standard payment terminal status for Seerbit');
+                // Return false to prevent standard status display
+                return false;
+            } else {
+                // Call the original method for non-Seerbit payments
+                return super.show_payment_terminal_status(line, status);
+            }
+        }
     };
 
     Registries.Component.extend(PaymentScreen, PosSeerbitPaymentScreen);

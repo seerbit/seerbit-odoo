@@ -314,7 +314,6 @@ class PosPaymentMethod(models.Model):
                     'amount_paid': 0.0,
                     'amount_return': 0.0,
                     'state': 'draft',
-                    'payment_status': 'pending',
                 }
                 
                 pos_order = self.env['pos.order'].sudo().create(order_vals)
@@ -329,16 +328,8 @@ class PosPaymentMethod(models.Model):
             if status in ['successful', 'success', 'completed']:
                 # Mark order as paid
                 pos_order.write({
-                    'state': 'paid',
-                    'payment_status': 'paid'
+                    'state': 'paid'
                 })
-
-                # Update payment lines
-                for payment_line in pos_order.payment_ids:
-                    if payment_line.payment_method_id.use_payment_terminal == 'seerbit':
-                        payment_line.write({
-                            'payment_status': 'done'
-                        })
 
                 # Create payment record
                 self._create_payment_record(pos_order, amount, 'NGN', transaction_id)
@@ -354,16 +345,8 @@ class PosPaymentMethod(models.Model):
             elif status in ['failed', 'cancelled', 'closed']:
                 # Mark order as failed
                 pos_order.write({
-                    'state': 'draft',
-                    'payment_status': 'failed'
+                    'state': 'draft'
                 })
-
-                # Update payment lines
-                for payment_line in pos_order.payment_ids:
-                    if payment_line.payment_method_id.use_payment_terminal == 'seerbit':
-                        payment_line.write({
-                            'payment_status': 'failed'
-                        })
 
                 _logger.info("Payment failed for order %s: %s", pos_order.name, transaction_id)
                 return {
@@ -391,28 +374,26 @@ class PosPaymentMethod(models.Model):
             transaction_id: Seerbit transaction ID
         """
         try:
-            # Create account.payment record
+            # Get the Seerbit payment method
+            payment_method = self.env['pos.payment.method'].sudo().search([
+                ('use_payment_terminal', '=', 'seerbit')
+            ], limit=1)
+            
+            if not payment_method:
+                _logger.error("No Seerbit payment method found")
+                return
+
+            # Create pos.payment record
             payment_vals = {
-                'payment_type': 'inbound',
-                'partner_type': 'customer',
-                'partner_id': pos_order.partner_id.id if pos_order.partner_id else False,
+                'order_id': pos_order.id,
+                'payment_method_id': payment_method.id,
                 'amount': float(amount),
-                'currency_id': self.env['res.currency'].search([('name', '=', currency)], limit=1).id or self.env['res.currency'].search([('name', '=', 'NGN')], limit=1).id,
-                'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id,
-                'journal_id': pos_order.session_id.config_id.journal_id.id,
-                'ref': f"Seerbit: {transaction_id}",
-                'communication': transaction_id,
-                'state': 'posted',
+                'name': f'Seerbit-{transaction_id}',
             }
 
-            payment = self.env['account.payment'].sudo().create(payment_vals)
+            payment = self.env['pos.payment'].sudo().create(payment_vals)
 
-            # Link payment to POS order
-            pos_order.write({
-                'payment_ids': [(4, payment.id)]
-            })
-
-            _logger.info("Created payment record %s for order %s", payment.name, pos_order.name)
+            _logger.info("Created payment record %s for order %s", payment.id, pos_order.name)
 
         except Exception as e:
             _logger.error("Error creating payment record: %s", str(e))

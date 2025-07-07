@@ -136,23 +136,112 @@ odoo.define('pos_seerbit.payment', function (require) {
             });
         },
 
+        // Override to prevent standard payment terminal UI
         send_payment_request: function (cid) {
             console.log('PaymentSeerbit: send_payment_request called with cid:', cid);
-            this._super.apply(this, arguments);
             this._reset_state();
             return this._seerbit_pay(cid);
         },
 
         send_payment_cancel: function (order, cid) {
             console.log('PaymentSeerbit: send_payment_cancel called');
-            this._super.apply(this, arguments);
             return this._seerbit_cancel();
         },
 
         close: function () {
             console.log('PaymentSeerbit: close called');
             this._seerbit_cancel();
-            this._super.apply(this, arguments);
+        },
+
+        // Override to prevent standard terminal UI display
+        show_payment_terminal_ui: function() {
+            console.log('PaymentSeerbit: show_payment_terminal_ui called - preventing standard UI');
+            // Return false to prevent standard terminal UI from showing
+            return false;
+        },
+
+        // Override to prevent transaction cancelled display
+        show_transaction_cancelled: function() {
+            console.log('PaymentSeerbit: show_transaction_cancelled called - preventing standard display');
+            // Return false to prevent standard cancelled display
+            return false;
+        },
+
+        // Override to prevent standard error display
+        show_payment_error: function(error) {
+            console.log('PaymentSeerbit: show_payment_error called - preventing standard error display');
+            // Return false to prevent standard error display
+            return false;
+        },
+
+        // Override to prevent standard status updates
+        update_payment_status: function(status) {
+            console.log('PaymentSeerbit: update_payment_status called with status:', status);
+            // Don't call super - prevent standard status updates
+            return false;
+        },
+
+        // Override to prevent standard terminal status
+        get_terminal_status: function() {
+            console.log('PaymentSeerbit: get_terminal_status called - returning custom status');
+            // Return custom status to prevent standard terminal status
+            return 'waitingSeerbit';
+        },
+
+        // Override to prevent standard terminal display
+        is_terminal_ready: function() {
+            console.log('PaymentSeerbit: is_terminal_ready called - returning true to prevent standard UI');
+            // Return true to prevent standard terminal UI from showing
+            return true;
+        },
+
+        // Override to prevent standard payment terminal popup
+        show_payment_terminal_popup: function() {
+            console.log('PaymentSeerbit: show_payment_terminal_popup called - preventing standard popup');
+            // Return false to prevent standard popup
+            return false;
+        },
+
+        // Override to prevent standard payment terminal status display
+        show_payment_terminal_status: function(status) {
+            console.log('PaymentSeerbit: show_payment_terminal_status called - preventing standard status display');
+            // Return false to prevent standard status display
+            return false;
+        },
+
+        // Override to prevent standard payment terminal error display
+        show_payment_terminal_error: function(error) {
+            console.log('PaymentSeerbit: show_payment_terminal_error called - preventing standard error display');
+            // Return false to prevent standard error display
+            return false;
+        },
+
+        // Override to prevent standard payment terminal success display
+        show_payment_terminal_success: function() {
+            console.log('PaymentSeerbit: show_payment_terminal_success called - preventing standard success display');
+            // Return false to prevent standard success display
+            return false;
+        },
+
+        // Override to prevent standard payment terminal registration
+        register_payment_terminal: function() {
+            console.log('PaymentSeerbit: register_payment_terminal called - preventing standard registration');
+            // Return false to prevent standard registration
+            return false;
+        },
+
+        // Override to prevent standard payment terminal initialization
+        initialize_payment_terminal: function() {
+            console.log('PaymentSeerbit: initialize_payment_terminal called - preventing standard initialization');
+            // Return false to prevent standard initialization
+            return false;
+        },
+
+        // Override to prevent standard payment terminal display
+        display_payment_terminal: function() {
+            console.log('PaymentSeerbit: display_payment_terminal called - preventing standard display');
+            // Return false to prevent standard display
+            return false;
         },
 
         // Add the missing start_get_status_polling method
