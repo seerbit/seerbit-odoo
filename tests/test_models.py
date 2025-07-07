@@ -227,10 +227,7 @@ class DummyPaymentMethod:
         return self
 
     def send_seerbit_payment_request(self, payload):
-        # Simulate formatting and saving
-        if payload.get('erpTransactionRef'):
-            payload['erpTransactionRef'] = format_erp_ref(
-                payload['erpTransactionRef'])
+        # Simulate saving
         self.seerbit_latest_response = json.dumps(payload)
         return True
 
@@ -244,50 +241,43 @@ class DummyPaymentMethod:
             stored_amount = stored.get(
                 "transactionValue") or stored.get("RequestedAmount")
             stored_currency = stored.get("currency") or stored.get("Currency")
-            expected_erp_ref = format_erp_ref(
-                expected.get("erpTransactionRef"))
-            stored_erp_ref = format_erp_ref(
-                stored.get("erpTransactionRef"))
+            
             if (
                 expected_currency == stored_currency
                 and round(float(expected_amount or 0), 2) == float(stored_amount or 0)
-                and expected_erp_ref == stored_erp_ref
             ):
                 self.seerbit_latest_response = ""
                 return {"latest_response": stored}
         return False
 
 
-def test_send_and_reconcile_with_various_erp_refs():
+def test_send_and_reconcile_with_amount_matching():
     pm = DummyPaymentMethod()
     payload = {
-        'erpTransactionRef': 'Test Order 1',
         'transactionValue': '100.00',
         'currency': 'USD',
     }
     pm.send_seerbit_payment_request(payload.copy())
-    # Should be normalized
+    # Should be saved
     stored = json.loads(pm.seerbit_latest_response)
-    assert stored['erpTransactionRef'] == 'odoo_testorder1'
+    assert stored['transactionValue'] == '100.00'
 
-    # Should match with various forms
-    for ref in ['Test Order 1', 'odoo_testorder1', '  test order 1  ']:
-        expected = {
-            'erpTransactionRef': ref,
-            'transactionValue': '100.00',
-            'Currency': 'USD',
-        }
-        result = pm.get_latest_seerbit_status(expected)
-        assert result and result['latest_response']['erpTransactionRef'] == 'odoo_testorder1'
-        # After match, should clear
-        assert pm.seerbit_latest_response == ''
-        # Reset for next test
-        pm.send_seerbit_payment_request(payload.copy())
-
-    # Should not match with wrong ref
+    # Should match with same amount and currency
     expected = {
-        'erpTransactionRef': 'otherorder',
         'transactionValue': '100.00',
+        'Currency': 'USD',
+    }
+    result = pm.get_latest_seerbit_status(expected)
+    assert result and result['latest_response']['transactionValue'] == '100.00'
+    # After match, should clear
+    assert pm.seerbit_latest_response == ''
+    
+    # Reset for next test
+    pm.send_seerbit_payment_request(payload.copy())
+
+    # Should not match with different amount
+    expected = {
+        'transactionValue': '50.00',
         'Currency': 'USD',
     }
     assert pm.get_latest_seerbit_status(expected) is False

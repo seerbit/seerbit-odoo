@@ -149,7 +149,6 @@ def send_to_firestore_transactions(env, payload):
             'sessionId': str(payload.get('sessionId', '')),
             'receivedDateTime': str(payload.get('receivedDateTime', '')),
             'transactionRef': str(payload.get('transactionRef', '')),
-            'erpTransactionRef': str(payload.get('erpTransactionRef', '')),
             'pubkey': str(payload.get('pubkey', '')),
         }
         
@@ -225,10 +224,6 @@ class PosPaymentMethod(models.Model):
 
     def send_seerbit_payment_request(self, payload):
         self.ensure_one()
-        # Always format erpTransactionRef
-        if payload.get('erpTransactionRef'):
-            payload['erpTransactionRef'] = self._format_erp_ref(
-                payload['erpTransactionRef'])
         
         # Save to Odoo for tracking first
         self.seerbit_latest_response = json.dumps(payload)
@@ -259,14 +254,10 @@ class PosPaymentMethod(models.Model):
             stored_amount = stored.get(
                 "transactionValue") or stored.get("RequestedAmount")
             stored_currency = stored.get("currency") or stored.get("Currency")
-            expected_erp_ref = self._format_erp_ref(
-                expected.get("erpTransactionRef"))
-            stored_erp_ref = self._format_erp_ref(
-                stored.get("erpTransactionRef"))
+            
             if (
                 expected_currency == stored_currency
                 and round(float(expected_amount or 0), 2) == float(stored_amount or 0)
-                and expected_erp_ref == stored_erp_ref
             ):
                 self.sudo().seerbit_latest_response = ""  # Avoid reusing responses
                 return {
@@ -293,15 +284,33 @@ class PosPaymentMethod(models.Model):
                 'transactionValue') or reconciliation_data.get('RequestedAmount')
             currency = reconciliation_data.get(
                 'currency') or reconciliation_data.get('Currency')
-            erp_ref = reconciliation_data.get('erpTransactionRef')
 
             if not transaction_id:
                 return {'status': 'error', 'message': 'Missing transaction ID'}
 
-            # Find the POS order by transaction ID
-            pos_order = self.env['pos.order'].sudo().search([
-                ('uid', '=', transaction_id)
-            ], limit=1)
+            # Find the POS order by transaction ID in payment lines
+            pos_order = None
+            
+            # Search for orders with matching amount and recent creation
+            if amount:
+                # Look for recent unpaid orders with matching amount
+                recent_orders = self.env['pos.order'].sudo().search([
+                    ('state', 'in', ['draft', 'paid']),
+                    ('amount_total', '=', float(amount))
+                ], order='create_date desc', limit=10)
+                
+                _logger.info("Searching for orders by amount %s: found %d orders", amount, len(recent_orders))
+                
+                for order in recent_orders:
+                    # Check if this order has a pending Seerbit payment
+                    for payment_line in order.payment_ids:
+                        if (payment_line.payment_method_id.use_payment_terminal == 'seerbit' and 
+                            payment_line.payment_status in ['pending', 'waiting']):
+                            pos_order = order
+                            _logger.info("Found matching order by amount and pending Seerbit payment: %s", order.name)
+                            break
+                    if pos_order:
+                        break
 
             if not pos_order:
                 _logger.warning(
@@ -325,13 +334,12 @@ class PosPaymentMethod(models.Model):
                 for payment_line in pos_order.payment_ids:
                     if payment_line.payment_method_id.use_payment_terminal == 'seerbit':
                         payment_line.write({
-                            'payment_status': 'done',
-                            'transaction_id': transaction_id
+                            'payment_status': 'done'
                         })
 
                 # Create payment record if not exists
                 self._create_payment_record(
-                    pos_order, amount, currency, transaction_id, erp_ref)
+                    pos_order, amount, currency, transaction_id)
 
                 _logger.info(
                     "Payment reconciled successfully for order %s: %s", pos_order.name, transaction_id)
@@ -353,8 +361,7 @@ class PosPaymentMethod(models.Model):
                 for payment_line in pos_order.payment_ids:
                     if payment_line.payment_method_id.use_payment_terminal == 'seerbit':
                         payment_line.write({
-                            'payment_status': 'failed',
-                            'transaction_id': transaction_id
+                            'payment_status': 'failed'
                         })
 
                 _logger.info("Payment failed for order %s: %s",
@@ -374,7 +381,7 @@ class PosPaymentMethod(models.Model):
             _logger.error("Error reconciling payment: %s", str(e))
             return {'status': 'error', 'message': f'Reconciliation error: {str(e)}'}
 
-    def _create_payment_record(self, pos_order, amount, currency, transaction_id, erp_ref):
+    def _create_payment_record(self, pos_order, amount, currency, transaction_id):
         """
         Create payment record for the reconciled transaction.
 
@@ -383,7 +390,6 @@ class PosPaymentMethod(models.Model):
             amount: Payment amount
             currency: Payment currency
             transaction_id: Seerbit transaction ID
-            erp_ref: ERP reference
         """
         try:
             # Create account.payment record
@@ -396,7 +402,7 @@ class PosPaymentMethod(models.Model):
                 'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id,
                 'journal_id': pos_order.session_id.config_id.journal_id.id,
                 'ref': f"Seerbit: {transaction_id}",
-                'communication': erp_ref or transaction_id,
+                'communication': transaction_id,
                 'state': 'posted',
             }
 

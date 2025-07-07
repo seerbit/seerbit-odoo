@@ -70,7 +70,6 @@ class MockPaymentLine:
         self.payment_method_id = payment_method
         self.amount = amount
         self.payment_status = status
-        self.transaction_id = None
 
     def write(self, vals):
         for key, value in vals.items():
@@ -102,7 +101,6 @@ class MockPaymentMethod:
                 'transactionValue') or reconciliation_data.get('RequestedAmount')
             currency = reconciliation_data.get(
                 'currency') or reconciliation_data.get('Currency')
-            erp_ref = reconciliation_data.get('erpTransactionRef')
 
             if not transaction_id:
                 return {'status': 'error', 'message': 'Missing transaction ID'}
@@ -123,8 +121,7 @@ class MockPaymentMethod:
                 # Mock payment line update
                 payment_line = MockPaymentLine(cls(), amount)
                 payment_line.write({
-                    'payment_status': 'done',
-                    'transaction_id': transaction_id
+                    'payment_status': 'done'
                 })
 
                 return {
@@ -142,8 +139,7 @@ class MockPaymentMethod:
 
                 payment_line = MockPaymentLine(cls(), amount)
                 payment_line.write({
-                    'payment_status': 'failed',
-                    'transaction_id': transaction_id
+                    'payment_status': 'failed'
                 })
 
                 return {

@@ -48,7 +48,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                     console.log('Reconciliation data received:', data);
 
                     const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                    if (pending && (data.id === pending.id || data.erpTransactionRef === pending.erpTransactionRef)) {
+                    if (pending && data.id === pending.id) {
                         console.log('Matching transaction found, processing reconciliation...');
                         
                         // Add reconciliation timestamp
@@ -107,20 +107,14 @@ odoo.define('pos_seerbit.payment', function (require) {
                 body: message || _t('The payment was successfully reconciled.'),
             });
         } else if (status === 'failed' || status === 'closed') {
-            Gui.showPopup('ErrorPopup', {
-                title: _t('Payment Failed'),
-                body: message || _t('The payment failed or was closed.'),
-            });
+            // Don't show error popup for failed payments - let the UI handle it
+            console.log('Payment failed - UI will show appropriate options');
         } else if (status === 'error') {
-            Gui.showPopup('ErrorPopup', {
-                title: _t('Payment Error'),
-                body: message || _t('An error occurred during payment processing.'),
-            });
+            // Don't show error popup for errors - let the UI handle it
+            console.log('Payment error - UI will show appropriate options');
         } else if (status === 'warning') {
-            Gui.showPopup('ConfirmPopup', {
-                title: _t('Payment Warning'),
-                body: message || _t('Payment processing completed with warnings.'),
-            });
+            // Show warning but don't block the UI
+            console.log('Payment warning:', message);
         }
     }
 
@@ -181,11 +175,12 @@ odoo.define('pos_seerbit.payment', function (require) {
                 }
 
                 console.log('Starting polling for transaction:', pending.id);
+                console.log('Pending transaction data:', pending);
 
                 // Set up polling to check for reconciliation
                 const checkStatus = () => {
                     if (this.was_cancelled) {
-                        console.log('Polling cancelled');
+                        console.log('Polling cancelled by user');
                         clearTimeout(this.polling);
                         resolve(false);
                         return;
@@ -201,6 +196,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                         return;
                     }
 
+                    console.log('Polling check - no reconciliation yet, continuing...');
                     // Continue polling every 2 seconds
                     this.polling = setTimeout(checkStatus, 2000);
                 };
@@ -208,14 +204,15 @@ odoo.define('pos_seerbit.payment', function (require) {
                 // Start polling
                 checkStatus();
 
-                // Set a timeout to stop polling after 5 minutes
+                // Set a timeout to stop polling after 10 minutes (more generous)
                 setTimeout(() => {
                     if (this.polling) {
-                        console.log('Polling timeout reached');
+                        console.log('Polling timeout reached - payment may still be processing');
                         clearTimeout(this.polling);
-                        resolve(false);
+                        // Don't resolve false - let the user decide with force confirm
+                        // The UI will remain in waitingSeerbit status
                     }
-                }, 300000); // 5 minutes
+                }, 600000); // 10 minutes instead of 5
             });
         },
 
@@ -235,6 +232,14 @@ odoo.define('pos_seerbit.payment', function (require) {
             // Force mark payment as done (for manual override)
             if (line && typeof line.set_payment_status === 'function') {
                 line.set_payment_status('done');
+                // Clear any pending transaction
+                localStorage.removeItem('pending_transaction');
+                localStorage.removeItem('reconciliation_complete');
+                // Stop any polling
+                if (this.polling) {
+                    clearTimeout(this.polling);
+                    this.polling = null;
+                }
                 this._show_error(_t('Payment manually confirmed.'), _t('Manual Override'));
             }
         },
@@ -244,6 +249,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             const order = this.pos.get_order();
             if (!order || !line || !line.cid) return;
             
+            console.log('Retrying payment request for line:', line.cid);
             const cid = line.cid;
             this._reset_state();
             return this._seerbit_pay(cid);
@@ -295,8 +301,6 @@ odoo.define('pos_seerbit.payment', function (require) {
                 "sessionId": "",
                 "receivedDateTime": receivedDateTime,
                 "transactionRef": "",
-                "erpTransactionRef": "",
-                "transactionTime": "",
                 "pubkey": paymentMethod.seerbit_public_key || "",
             };
             return payload;
@@ -337,13 +341,16 @@ odoo.define('pos_seerbit.payment', function (require) {
                 }
             }).catch((error) => {
                 console.error('Payment request failed:', error);
-                // Set error status for retry button
+                // Don't immediately set error status - let user decide
                 const line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
                 if (line && typeof line.set_payment_status === 'function') {
-                    line.set_payment_status('errorSeerbit');
+                    // Keep waiting status to show force confirm option
+                    line.set_payment_status('waitingSeerbit');
                 }
-                this._show_error(_t('Could not send payment request.'), 'Seerbit Error');
-                throw error;
+                // Show error but don't throw - allow user to force confirm
+                this._show_error(_t('Could not send payment request. You can force confirm if payment was made.'), 'Seerbit Warning');
+                // Don't throw error - let the flow continue
+                return Promise.resolve();
             });
         },
 

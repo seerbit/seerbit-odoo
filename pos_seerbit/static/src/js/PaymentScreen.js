@@ -39,17 +39,18 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                                 pendingPaymentLine.set_payment_status('done');
                                 pendingPaymentLine.can_be_reversed = paymentTerminal.supports_reversals || false;
                             } else {
-                                // pendingPaymentLine.set_payment_status('retry');
                                 // Don't automatically set to retry - let user decide
                                 // The force confirm button should be available
                                 console.log('Payment polling completed without success - force confirm available');
+                                // Keep the waiting status to show force confirm option
+                                pendingPaymentLine.set_payment_status('waitingSeerbit');
                             }
                         }).catch(error => {
                             console.error('Error during payment polling:', error);
-                            pendingPaymentLine.set_payment_status('errorSeerbit');
-// 
                             // Don't set error status immediately - allow force confirm
                             console.log('Payment polling error - force confirm available');
+                            // Keep the waiting status to show force confirm option
+                            pendingPaymentLine.set_payment_status('waitingSeerbit');
                         });
                     } else {
                         console.warn('Payment terminal or start_get_status_polling method not available');
