@@ -7,6 +7,9 @@ import string
 import warnings
 import sys
 
+# Set up logging first
+_logger = logging.getLogger(__name__)
+
 # Suppress all warnings from firebase_admin before importing
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -34,15 +37,13 @@ except ImportError as e:
     firebase_admin = None
     credentials = None
     firestore = None
-    logging.getLogger(__name__).warning("Firebase Admin SDK not available: %s", str(e))
+    _logger.warning("Firebase Admin SDK not available: %s", str(e))
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from werkzeug.exceptions import Forbidden
 
 from odoo.addons.pos_seerbit.utils import format_erp_ref
-
-_logger = logging.getLogger(__name__)
 
 # Initialize Firestore only once
 _firestore_initialized = False
