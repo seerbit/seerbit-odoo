@@ -11,9 +11,21 @@ odoo.define('pos_seerbit.payment', function (require) {
     var FirebaseInit = require('pos_seerbit.firebase_init');
 
     function listenForReconciliation(transactionId) {
+        console.log('Setting up reconciliation listener for transaction:', transactionId);
+        
         // Ensure Firebase is initialized
         if (!FirebaseInit.isFirebaseAvailable()) {
-            console.warn('Firebase not available for reconciliation');
+            console.warn('Firebase not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
+            
+            // Try to reinitialize Firebase
+            FirebaseInit.reinitializeFirebase().then(function(success) {
+                if (success) {
+                    console.log('Firebase reinitialized successfully, setting up listener');
+                    listenForReconciliation(transactionId);
+                } else {
+                    console.error('Failed to reinitialize Firebase');
+                }
+            });
             return;
         }
 
@@ -23,13 +35,17 @@ odoo.define('pos_seerbit.payment', function (require) {
             return;
         }
 
+        console.log('Setting up Firebase reconciliation listener...');
         const reconciliationsRef = firebaseDb.ref('reconciliations');
         reconciliationsRef.on('child_added', function(snapshot) {
             const data = snapshot.val();
             if (!data) return;
 
+            console.log('Reconciliation data received:', data);
+
             const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
             if (pending && (data.id === pending.id || data.erpTransactionRef === pending.erpTransactionRef)) {
+                console.log('Matching transaction found, processing reconciliation...');
                 rpc.query({
                     model: 'pos.payment.method',
                     method: 'reconcile_payment',
@@ -46,8 +62,12 @@ odoo.define('pos_seerbit.payment', function (require) {
                     console.error('Reconciliation failed:', error);
                     updatePaymentStatusUI('error', 'Reconciliation failed - please contact support');
                 });
+            } else {
+                console.log('Transaction mismatch or no pending transaction');
             }
         });
+
+        console.log('Firebase reconciliation listener set up successfully');
     }
 
     function updatePaymentStatusUI(status, message) {
@@ -86,11 +106,16 @@ odoo.define('pos_seerbit.payment', function (require) {
             console.log('PaymentSeerbit initialized');
             
             // Initialize Firebase when payment interface is created
+            this._initializeFirebase();
+        },
+
+        _initializeFirebase: function() {
+            console.log('Initializing Firebase for PaymentSeerbit...');
             FirebaseInit.initializeFirebase().then(function(success) {
                 if (success) {
-                    console.log('Firebase initialized for Seerbit payments');
+                    console.log('Firebase initialized successfully for Seerbit payments');
                 } else {
-                    console.warn('Firebase initialization failed for Seerbit payments');
+                    console.warn('Firebase initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
                 }
             }).catch(function(error) {
                 console.error('Firebase initialization error:', error);
@@ -247,12 +272,15 @@ odoo.define('pos_seerbit.payment', function (require) {
                 return Promise.reject(error);
             }
 
+            console.log('Sending payment request with payload:', payload);
+
             // Send to backend to push to Firebase
             return rpc.query({
                 model: 'pos.payment.method',
                 method: 'send_seerbit_payment_request',
                 args: [[order.selected_paymentline.payment_method.id], payload],
             }).then(() => {
+                console.log('Payment request sent successfully');
                 // Save to localStorage for recovery
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
                 // Start listening for reconciliation
@@ -263,13 +291,13 @@ odoo.define('pos_seerbit.payment', function (require) {
                     line.set_payment_status('waitingSeerbit');
                 }
             }).catch((error) => {
+                console.error('Payment request failed:', error);
                 // Set error status for retry button
                 const line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
                 if (line && typeof line.set_payment_status === 'function') {
                     line.set_payment_status('errorSeerbit');
                 }
                 this._show_error(_t('Could not send payment request.'), 'Seerbit Error');
-                console.error('Payment request failed:', error);
                 throw error;
             });
         },

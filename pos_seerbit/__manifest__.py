@@ -31,10 +31,12 @@
     "application": False,
     "auto_install": False,
     "assets": {
+        # Option 1: Current setup (RECOMMENDED)
+        # Firebase in web.assets_backend for global availability
         "web.assets_backend": [
-            # Firebase SDK
-            ("include", "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"),
-            ("include", "https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"),
+            # Firebase SDK - Local files for better reliability
+            "pos_seerbit/static/lib/firebase/firebase-app-compat.js",
+            "pos_seerbit/static/lib/firebase/firebase-database-compat.js",
         ],
         "point_of_sale.assets": [
             # Seerbit assets
@@ -42,6 +44,7 @@
             "pos_seerbit/static/src/scss/**/*",
             "pos_seerbit/static/src/xml/**/*",
         ],
+        
     },
     "license": "OPL-1",
     "images": ["static/description/seerbit.gif"],

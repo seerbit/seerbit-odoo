@@ -76,7 +76,10 @@ def initialize_firebase(env):
 
         try:
             cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred, name='[DEFAULT]')
+            firebase_admin.initialize_app(cred, 
+                                          {
+                                              'databaseURL': db_url
+                                          })
             _firebase_initialized = True
             _logger.info("Firebase initialized successfully")
             return True
@@ -201,7 +204,7 @@ class PosPaymentMethod(models.Model):
             _logger.warning(
                 "Seerbit payment request saved to Odoo but Firebase send failed: %s", pprint.pformat(payload))
         
-        return True
+        return False
 
     def get_latest_seerbit_status(self, expected):
         self.ensure_one()

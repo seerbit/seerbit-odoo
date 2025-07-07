@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Local Test</title>
+</head>
+<body>
+    <h1>Firebase Local Files Test</h1>
+    <div id="status">Loading...</div>
+    
+    <!-- Load Firebase files locally -->
+    <script src="pos_seerbit/static/lib/firebase/firebase-app-compat.js"></script>
+    <script src="pos_seerbit/static/lib/firebase/firebase-database-compat.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                // Check if Firebase is loaded
+                if (typeof firebase === 'undefined') {
+                    statusDiv.innerHTML = '❌ Firebase not loaded';
+                    return;
+                }
+                
+                statusDiv.innerHTML = '✅ Firebase loaded successfully<br>';
+                statusDiv.innerHTML += `Version: ${firebase.SDK_VERSION}<br>`;
+                statusDiv.innerHTML += `Apps: ${firebase.apps ? firebase.apps.length : 0}<br>`;
+                
+                // Test Firebase initialization
+                const testConfig = {
+                    apiKey: "test-key",
+                    databaseURL: "https://test.firebaseio.com",
+                    projectId: "test-project"
+                };
+                
+                try {
+                    firebase.initializeApp(testConfig);
+                    statusDiv.innerHTML += '✅ Firebase initialization successful<br>';
+                    
+                    // Test database
+                    if (firebase.database) {
+                        statusDiv.innerHTML += '✅ Firebase Database available<br>';
+                    } else {
+                        statusDiv.innerHTML += '❌ Firebase Database not available<br>';
+                    }
+                    
+                } catch (initError) {
+                    statusDiv.innerHTML += `⚠️ Firebase initialization test: ${initError.message}<br>`;
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html> 

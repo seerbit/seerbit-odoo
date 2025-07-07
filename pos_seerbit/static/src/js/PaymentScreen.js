@@ -7,7 +7,7 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
     const PosSeerbitPaymentScreen = PaymentScreen => class extends PaymentScreen {
         setup() {
-            super.setup();
+        super.setup();
             onMounted(() => {
                 console.log('PosSeerbitPaymentScreen: onMounted called');
                 
@@ -31,15 +31,15 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                     // Check if payment terminal and its methods are available
                     if (paymentTerminal && typeof paymentTerminal.start_get_status_polling === 'function') {
                         console.log('Starting payment polling...');
-                        pendingPaymentLine.set_payment_status('waitingSeerbit');
-                        paymentTerminal.start_get_status_polling().then(isPaymentSuccessful => {
+                    pendingPaymentLine.set_payment_status('waitingSeerbit');
+                    paymentTerminal.start_get_status_polling().then(isPaymentSuccessful => {
                             console.log('Payment polling result:', isPaymentSuccessful);
-                            if (isPaymentSuccessful) {
-                                pendingPaymentLine.set_payment_status('done');
+                        if (isPaymentSuccessful) {
+                            pendingPaymentLine.set_payment_status('done');
                                 pendingPaymentLine.can_be_reversed = paymentTerminal.supports_reversals || false;
-                            } else {
-                                pendingPaymentLine.set_payment_status('retry');
-                            }
+                        } else {
+                            pendingPaymentLine.set_payment_status('retry');
+                        }
                         }).catch(error => {
                             console.error('Error during payment polling:', error);
                             pendingPaymentLine.set_payment_status('errorSeerbit');
