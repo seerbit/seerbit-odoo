@@ -7,7 +7,7 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
     const PosSeerbitPaymentScreen = PaymentScreen => class extends PaymentScreen {
         setup() {
-        super.setup();
+            super.setup();
             onMounted(() => {
                 console.log('PosSeerbitPaymentScreen: onMounted called');
                 
@@ -31,18 +31,25 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                     // Check if payment terminal and its methods are available
                     if (paymentTerminal && typeof paymentTerminal.start_get_status_polling === 'function') {
                         console.log('Starting payment polling...');
-                    pendingPaymentLine.set_payment_status('waitingSeerbit');
-                    paymentTerminal.start_get_status_polling().then(isPaymentSuccessful => {
+                        pendingPaymentLine.set_payment_status('waitingSeerbit');
+                        
+                        paymentTerminal.start_get_status_polling().then(isPaymentSuccessful => {
                             console.log('Payment polling result:', isPaymentSuccessful);
-                        if (isPaymentSuccessful) {
-                            pendingPaymentLine.set_payment_status('done');
+                            if (isPaymentSuccessful) {
+                                pendingPaymentLine.set_payment_status('done');
                                 pendingPaymentLine.can_be_reversed = paymentTerminal.supports_reversals || false;
-                        } else {
-                            pendingPaymentLine.set_payment_status('retry');
-                        }
+                            } else {
+                                // pendingPaymentLine.set_payment_status('retry');
+                                // Don't automatically set to retry - let user decide
+                                // The force confirm button should be available
+                                console.log('Payment polling completed without success - force confirm available');
+                            }
                         }).catch(error => {
                             console.error('Error during payment polling:', error);
                             pendingPaymentLine.set_payment_status('errorSeerbit');
+// 
+                            // Don't set error status immediately - allow force confirm
+                            console.log('Payment polling error - force confirm available');
                         });
                     } else {
                         console.warn('Payment terminal or start_get_status_polling method not available');

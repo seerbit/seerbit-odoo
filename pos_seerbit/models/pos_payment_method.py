@@ -137,17 +137,28 @@ def send_to_firestore_transactions(env, payload):
         # Get Firestore client
         db = firestore.client()
         
-        # Add timestamp for better tracking
-        payload['timestamp'] = firestore.SERVER_TIMESTAMP
-        payload['created_by'] = 'odoo_pos_seerbit'
-        payload['created_time'] = fields.Datetime.now().isoformat()
+        # Ensure all values are stringified and add server timestamp
+        firestore_payload = {
+            'id': str(payload.get('id', '')),
+            'posid': str(payload.get('posid', '')),
+            'merchantid': str(payload.get('merchantid', "")),
+            'metadata': str(payload.get('metadata', '')),
+            'transactionValue': str(payload.get('transactionValue', '')),
+            'status': str(payload.get('status', '')),
+            'transactionTime': str(payload.get('transactionTime', '')),
+            'sessionId': str(payload.get('sessionId', '')),
+            'receivedDateTime': str(payload.get('receivedDateTime', '')),
+            'transactionRef': str(payload.get('transactionRef', '')),
+            'erpTransactionRef': str(payload.get('erpTransactionRef', '')),
+            'pubkey': str(payload.get('pubkey', '')),
+        }
         
         # Add to transactions collection
         doc_ref = db.collection('transactions').document()
-        doc_ref.set(payload)
+        doc_ref.set(firestore_payload)
         
         _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
-        _logger.info('Payload sent: %s', pprint.pformat(payload))
+        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))
         return True
     except Exception as e:
         _logger.error("Failed to send payment request to Firestore: %s", str(e))
@@ -166,15 +177,20 @@ class PosPaymentMethod(models.Model):
         help="As provided on Seerbit dashboard", 
         copy=False
     )
+    seerbit_terminal_id = fields.Char(
+        string="Seerbit Terminal ID", 
+        help="Terminal ID as provided on Seerbit dashboard", 
+        copy=False
+    )
     seerbit_latest_response = fields.Char(
         copy=False, 
         groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
-    @api.constrains("seerbit_public_key")
+    @api.constrains("seerbit_public_key", "seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
-            if not (payment_method.seerbit_public_key):
+            if not (payment_method.seerbit_public_key and payment_method.seerbit_terminal_id):
                 continue
             # Payment methods are now expected to separate at the account levels irrepective of the number of terminals
             existing_key = self.search(

@@ -55,10 +55,23 @@ odoo.define('pos_seerbit.payment', function (require) {
                         data.reconciliation_time = new Date().toISOString();
                         data.reconciled_by = 'odoo_pos_frontend';
                         
+                        // Ensure all reconciliation data is properly formatted
+                        const reconciliationData = {
+                            'id': data.id || '',
+                            'transactionValue': data.transactionValue || '',
+                            'receivedDateTime': data.receivedDateTime || '',
+                            'status': data.status || '',
+                            'transactionTime': data.transactionTime || '',
+                            'posid': data.posid || '',
+                            'transactionRef': data.transactionRef || '',
+                            'reconciliation_time': data.reconciliation_time,
+                            'reconciled_by': data.reconciled_by
+                        };
+                        
                         rpc.query({
                             model: 'pos.payment.method',
                             method: 'reconcile_payment',
-                            args: [data],
+                            args: [reconciliationData],
                         }).then(function(result) {
                             console.log('Reconciliation RPC result:', result);
                             
@@ -253,21 +266,38 @@ odoo.define('pos_seerbit.payment', function (require) {
             }
 
             const paymentline = order.selected_paymentline;
-            // Convert order name to id-like string
-            let orderRef = order.name ? String(order.name).replace(/\s+/g, '').toLowerCase() : '';
+            const paymentMethod = paymentline.payment_method;
+            
+            // Get current date in dd/mm/yyyy format
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const receivedDateTime = `${day}/${month}/${year}`;
+            
+            // Create metadata with additional server fields
+            const metadata = JSON.stringify({
+                'created_by': 'odoo_pos_seerbit',
+                'created_time': now.toISOString(),
+                'order_id': order.uid,
+                'pos_config_id': this.pos.config.id,
+                'user_id': this.pos.user.id
+            });
+            
             const payload = {
-                id: order.uid, // Odoo order id
-                posid: this.pos.config.id, // POS terminal id
-                merchantid: this.pos.user.id, // Odoo user id
-                transactionValue: paymentline.amount.toFixed(2),
-                status: 'open',
-                merchatTerminalId: this.pos.config.id,
-                transactionRef: '',
-                senTime: new Date().toISOString(),
-                receivDateTime: '',
-                erpTransactionRef: 'odoo_' + orderRef, // Always prefix, id-like
-                transactionId: '',
-                pubkey: paymentline.payment_method.seerbit_public_key,
+                "id": order.uid.toString(),
+                "posid": paymentMethod.seerbit_terminal_id || "",
+                "merchantid": "",
+                "metadata": metadata,
+                "transactionValue": paymentline.amount.toFixed(2),
+                "status": "open",
+                "transactionTime": "",
+                "sessionId": "",
+                "receivedDateTime": receivedDateTime,
+                "transactionRef": "",
+                "erpTransactionRef": "",
+                "transactionTime": "",
+                "pubkey": paymentMethod.seerbit_public_key || "",
             };
             return payload;
         },
