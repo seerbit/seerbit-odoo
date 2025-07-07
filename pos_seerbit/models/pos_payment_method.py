@@ -277,45 +277,48 @@ class PosPaymentMethod(models.Model):
             dict: Result of reconciliation
         """
         try:
-            # Extract transaction details
+            # Extract essential transaction details
             transaction_id = reconciliation_data.get('id')
             status = reconciliation_data.get('status', 'unknown')
-            amount = reconciliation_data.get(
-                'transactionValue') or reconciliation_data.get('RequestedAmount')
-            currency = reconciliation_data.get(
-                'currency') or reconciliation_data.get('Currency')
+            amount = reconciliation_data.get('transactionValue')
 
             if not transaction_id:
                 return {'status': 'error', 'message': 'Missing transaction ID'}
 
-            # Find the POS order by transaction ID in payment lines
-            pos_order = None
-            
-            # Search for orders with matching amount and recent creation
-            if amount:
-                # Look for recent unpaid orders with matching amount
-                recent_orders = self.env['pos.order'].sudo().search([
-                    ('state', 'in', ['draft', 'paid']),
-                    ('amount_total', '=', float(amount))
-                ], order='create_date desc', limit=10)
-                
-                _logger.info("Searching for orders by amount %s: found %d orders", amount, len(recent_orders))
-                
-                for order in recent_orders:
-                    # Check if this order has a pending Seerbit payment
-                    for payment_line in order.payment_ids:
-                        if (payment_line.payment_method_id.use_payment_terminal == 'seerbit' and 
-                            payment_line.payment_status in ['pending', 'waiting']):
-                            pos_order = order
-                            _logger.info("Found matching order by amount and pending Seerbit payment: %s", order.name)
-                            break
-                    if pos_order:
-                        break
+            if not amount:
+                return {'status': 'error', 'message': 'Missing transaction amount'}
+
+            # Find the POS order by amount (most reliable method)
+            pos_order = self.env['pos.order'].sudo().search([
+                ('state', 'in', ['draft', 'paid']),
+                ('amount_total', '=', float(amount))
+            ], order='create_date desc', limit=1)
 
             if not pos_order:
-                _logger.warning(
-                    "No POS order found for transaction ID: %s", transaction_id)
-                return {'status': 'warning', 'message': 'No matching order found'}
+                _logger.info("No existing order found for amount %s, creating new order", amount)
+                
+                # Get the current POS session
+                current_session = self.env['pos.session'].sudo().search([
+                    ('state', '=', 'opened')
+                ], limit=1)
+                
+                if not current_session:
+                    _logger.error("No open POS session found")
+                    return {'status': 'error', 'message': 'No open POS session found'}
+                
+                # Create a new POS order for reconciliation
+                order_vals = {
+                    'name': f'Seerbit-{transaction_id}',
+                    'session_id': current_session.id,
+                    'amount_total': float(amount),
+                    'amount_paid': 0.0,
+                    'amount_return': 0.0,
+                    'state': 'draft',
+                    'payment_status': 'pending',
+                }
+                
+                pos_order = self.env['pos.order'].sudo().create(order_vals)
+                _logger.info("Created new order for reconciliation: %s", pos_order.name)
 
             # Check if order is already paid
             if pos_order.state in ['paid', 'done']:
@@ -337,12 +340,10 @@ class PosPaymentMethod(models.Model):
                             'payment_status': 'done'
                         })
 
-                # Create payment record if not exists
-                self._create_payment_record(
-                    pos_order, amount, currency, transaction_id)
+                # Create payment record
+                self._create_payment_record(pos_order, amount, 'NGN', transaction_id)
 
-                _logger.info(
-                    "Payment reconciled successfully for order %s: %s", pos_order.name, transaction_id)
+                _logger.info("Payment reconciled successfully for order %s: %s", pos_order.name, transaction_id)
                 return {
                     'status': 'success',
                     'message': 'Payment reconciled successfully',
@@ -350,7 +351,7 @@ class PosPaymentMethod(models.Model):
                     'amount': amount
                 }
 
-            elif status in ['failed', 'failed', 'cancelled', 'closed']:
+            elif status in ['failed', 'cancelled', 'closed']:
                 # Mark order as failed
                 pos_order.write({
                     'state': 'draft',
@@ -364,8 +365,7 @@ class PosPaymentMethod(models.Model):
                             'payment_status': 'failed'
                         })
 
-                _logger.info("Payment failed for order %s: %s",
-                             pos_order.name, transaction_id)
+                _logger.info("Payment failed for order %s: %s", pos_order.name, transaction_id)
                 return {
                     'status': 'failed',
                     'message': 'Payment failed',
@@ -373,8 +373,7 @@ class PosPaymentMethod(models.Model):
                 }
 
             else:
-                _logger.warning(
-                    "Unknown payment status: %s for transaction %s", status, transaction_id)
+                _logger.warning("Unknown payment status: %s for transaction %s", status, transaction_id)
                 return {'status': 'warning', 'message': f'Unknown status: {status}'}
 
         except Exception as e:
@@ -398,7 +397,7 @@ class PosPaymentMethod(models.Model):
                 'partner_type': 'customer',
                 'partner_id': pos_order.partner_id.id if pos_order.partner_id else False,
                 'amount': float(amount),
-                'currency_id': self.env['res.currency'].search([('name', '=', currency)], limit=1).id,
+                'currency_id': self.env['res.currency'].search([('name', '=', currency)], limit=1).id or self.env['res.currency'].search([('name', '=', 'NGN')], limit=1).id,
                 'payment_method_id': self.env.ref('account.account_payment_method_manual_in').id,
                 'journal_id': pos_order.session_id.config_id.journal_id.id,
                 'ref': f"Seerbit: {transaction_id}",
@@ -413,8 +412,7 @@ class PosPaymentMethod(models.Model):
                 'payment_ids': [(4, payment.id)]
             })
 
-            _logger.info("Created payment record %s for order %s",
-                         payment.name, pos_order.name)
+            _logger.info("Created payment record %s for order %s", payment.name, pos_order.name)
 
         except Exception as e:
             _logger.error("Error creating payment record: %s", str(e))

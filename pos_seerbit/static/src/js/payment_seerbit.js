@@ -75,46 +75,38 @@ odoo.define('pos_seerbit.payment', function (require) {
                         }).then(function(result) {
                             console.log('Reconciliation RPC result:', result);
                             
-                            // Update UI, clear localStorage, log
+                            // Update UI and clear localStorage
                             updatePaymentStatusUI(result.status, result.message);
                             localStorage.removeItem('pending_transaction');
-                            // Set flag for polling to detect completion
                             localStorage.setItem('reconciliation_complete', 'true');
-                            console.log('Reconciliation complete via RPC:', result);
                         }).catch(function(error) {
-                            console.warn('RPC reconciliation failed:', error);
                             console.error('Reconciliation failed:', error);
-                            updatePaymentStatusUI('error', 'Reconciliation failed - please contact support');
+                            updatePaymentStatusUI('error', 'Reconciliation failed');
                         });
-                    } else {
-                        console.log('Transaction mismatch or no pending transaction. Pending:', pending ? pending.id : 'none');
                     }
                 }
             });
         }, function(error) {
             console.error('Firestore listener error:', error);
         });
-
-        console.log('Firestore reconciliation listener set up successfully');
     }
 
     function updatePaymentStatusUI(status, message) {
-        // Implement UI update logic here (e.g., show Paid/Failed)
-        // This can be customized to your POS UI
-        if (status === 'success' || status === 'successful') {
+        // Updated to handle "completed" status from Firestore
+        if (status === 'success' || status === 'completed') {
             Gui.showPopup('ConfirmPopup', {
                 title: _t('Payment Successful'),
                 body: message || _t('The payment was successfully reconciled.'),
             });
-        } else if (status === 'failed' || status === 'closed') {
-            // Don't show error popup for failed payments - let the UI handle it
-            console.log('Payment failed - UI will show appropriate options');
+        } else if (status === 'failed') {
+            Gui.showPopup('ErrorPopup', {
+                title: _t('Payment Failed'),
+                body: message || _t('The payment was not successfully reconciled.'),
+            });
         } else if (status === 'error') {
-            // Don't show error popup for errors - let the UI handle it
-            console.log('Payment error - UI will show appropriate options');
-        } else if (status === 'warning') {
-            // Show warning but don't block the UI
-            console.log('Payment warning:', message);
+            console.log('Payment error:', message);
+        } else {
+            console.log('Payment status:', status, message);
         }
     }
 
@@ -204,25 +196,22 @@ odoo.define('pos_seerbit.payment', function (require) {
                 // Start polling
                 checkStatus();
 
-                // Set a timeout to stop polling after 10 minutes (more generous)
+                // Set a timeout to stop polling after 10 minutes
                 setTimeout(() => {
                     if (this.polling) {
-                        console.log('Polling timeout reached - payment may still be processing');
+                        console.log('Polling timeout reached');
                         clearTimeout(this.polling);
-                        // Don't resolve false - let the user decide with force confirm
-                        // The UI will remain in waitingSeerbit status
                     }
-                }, 600000); // 10 minutes instead of 5
+                }, 600000); // 10 minutes
             });
         },
 
         pending_seerbit_line: function() {
             const order = this.pos.get_order();
-            if (!order || !order.paymentlines) return null;
+            if (!order?.paymentlines) return null;
             
             return order.paymentlines.find(
-                paymentLine => paymentLine.payment_method && 
-                              paymentLine.payment_method.use_payment_terminal === 'seerbit' && 
+                paymentLine => paymentLine?.payment_method?.use_payment_terminal === 'seerbit' && 
                               !paymentLine.is_done()
             );
         },
@@ -230,7 +219,7 @@ odoo.define('pos_seerbit.payment', function (require) {
         // Trigger handlers for UI buttons
         send_force_done: function (line) {
             // Force mark payment as done (for manual override)
-            if (line && typeof line.set_payment_status === 'function') {
+            if (line?.set_payment_status) {
                 line.set_payment_status('done');
                 // Clear any pending transaction
                 localStorage.removeItem('pending_transaction');
@@ -247,7 +236,7 @@ odoo.define('pos_seerbit.payment', function (require) {
         send_payment_request_retry: function (line) {
             // Retry sending payment request
             const order = this.pos.get_order();
-            if (!order || !line || !line.cid) return;
+            if (!order || !line?.cid) return;
             
             console.log('Retrying payment request for line:', line.cid);
             const cid = line.cid;
@@ -267,12 +256,12 @@ odoo.define('pos_seerbit.payment', function (require) {
         _seerbit_pay_data: function () {
             // Construct the payload as per your spec
             const order = this.pos.get_order();
-            if (!order || !order.selected_paymentline) {
+            if (!order?.selected_paymentline) {
                 throw new Error('No order or payment line selected');
             }
 
             const paymentline = order.selected_paymentline;
-            const paymentMethod = paymentline.payment_method;
+            const paymentMethod = paymentline?.payment_method;
             
             // Get current date in dd/mm/yyyy format
             const now = new Date();
@@ -286,22 +275,22 @@ odoo.define('pos_seerbit.payment', function (require) {
                 'created_by': 'odoo_pos_seerbit',
                 'created_time': now.toISOString(),
                 'order_id': order.uid,
-                'pos_config_id': this.pos.config.id,
-                'user_id': this.pos.user.id
+                'pos_config_id': this.pos.config?.id,
+                'user_id': this.pos.user?.id
             });
             
             const payload = {
-                "id": order.uid.toString(),
-                "posid": paymentMethod.seerbit_terminal_id || "",
+                "id": order.uid?.toString(),
+                "posid": paymentMethod?.seerbit_terminal_id || "",
                 "merchantid": "",
                 "metadata": metadata,
-                "transactionValue": paymentline.amount.toFixed(2),
+                "transactionValue": paymentline.amount?.toFixed(2),
                 "status": "open",
                 "transactionTime": "",
                 "sessionId": "",
                 "receivedDateTime": receivedDateTime,
                 "transactionRef": "",
-                "pubkey": paymentMethod.seerbit_public_key || "",
+                "pubkey": paymentMethod?.seerbit_public_key || "",
             };
             return payload;
         },
@@ -327,29 +316,36 @@ odoo.define('pos_seerbit.payment', function (require) {
             return rpc.query({
                 model: 'pos.payment.method',
                 method: 'send_seerbit_payment_request',
-                args: [[order.selected_paymentline.payment_method.id], payload],
+                args: [[order.selected_paymentline?.payment_method?.id], payload],
             }).then(() => {
                 console.log('Payment request sent successfully');
+                
                 // Save to localStorage for recovery
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
+                
                 // Start listening for reconciliation
                 listenForReconciliation(payload.id);
+                
                 // Set UI to waiting
-                const line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
-                if (line && typeof line.set_payment_status === 'function') {
+                const line = order.paymentlines?.find(paymentLine => paymentLine.cid === cid);
+                if (line?.set_payment_status) {
                     line.set_payment_status('waitingSeerbit');
+                    console.log('Payment request sent and waiting for reconciliation');
                 }
+                
+                return Promise.resolve();
             }).catch((error) => {
                 console.error('Payment request failed:', error);
-                // Don't immediately set error status - let user decide
-                const line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
-                if (line && typeof line.set_payment_status === 'function') {
-                    // Keep waiting status to show force confirm option
+                
+                // Set UI to waiting even on error to show force confirm option
+                const line = order.paymentlines?.find(paymentLine => paymentLine.cid === cid);
+                if (line?.set_payment_status) {
                     line.set_payment_status('waitingSeerbit');
                 }
+                
                 // Show error but don't throw - allow user to force confirm
                 this._show_error(_t('Could not send payment request. You can force confirm if payment was made.'), 'Seerbit Warning');
-                // Don't throw error - let the flow continue
+                
                 return Promise.resolve();
             });
         },
