@@ -15,59 +15,74 @@ odoo.define('pos_seerbit.payment', function (require) {
         
         // Ensure Firebase is initialized
         if (!FirebaseInit.isFirebaseAvailable()) {
-            console.warn('Firebase not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
+            console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
             
             // Try to reinitialize Firebase
             FirebaseInit.reinitializeFirebase().then(function(success) {
                 if (success) {
-                    console.log('Firebase reinitialized successfully, setting up listener');
+                    console.log('Firestore reinitialized successfully, setting up listener');
                     listenForReconciliation(transactionId);
                 } else {
-                    console.error('Failed to reinitialize Firebase');
+                    console.error('Failed to reinitialize Firestore');
                 }
             });
             return;
         }
 
-        const firebaseDb = FirebaseInit.getFirebaseDb();
-        if (!firebaseDb) {
-            console.warn('Firebase database not available for reconciliation');
+        const firestoreDb = FirebaseInit.getFirestoreDb();
+        if (!firestoreDb) {
+            console.warn('Firestore database not available for reconciliation');
             return;
         }
 
-        console.log('Setting up Firebase reconciliation listener...');
-        const reconciliationsRef = firebaseDb.ref('reconciliations');
-        reconciliationsRef.on('child_added', function(snapshot) {
-            const data = snapshot.val();
-            if (!data) return;
+        console.log('Setting up Firestore reconciliation listener...');
+        
+        // Listen for new documents in reconciliations collection
+        const reconciliationsRef = firestoreDb.collection('reconciliations');
+        const unsubscribe = reconciliationsRef.onSnapshot(function(snapshot) {
+            console.log('Reconciliation snapshot received with', snapshot.docChanges().length, 'changes');
+            
+            snapshot.docChanges().forEach(function(change) {
+                if (change.type === 'added') {
+                    const data = change.doc.data();
+                    console.log('Reconciliation data received:', data);
 
-            console.log('Reconciliation data received:', data);
-
-            const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-            if (pending && (data.id === pending.id || data.erpTransactionRef === pending.erpTransactionRef)) {
-                console.log('Matching transaction found, processing reconciliation...');
-                rpc.query({
-                    model: 'pos.payment.method',
-                    method: 'reconcile_payment',
-                    args: [data],
-                }).then(function(result) {
-                    // Update UI, clear localStorage, log
-                    updatePaymentStatusUI(result.status, result.message);
-                    localStorage.removeItem('pending_transaction');
-                    // Set flag for polling to detect completion
-                    localStorage.setItem('reconciliation_complete', 'true');
-                    console.log('Reconciliation complete via RPC:', result);
-                }).catch(function(error) {
-                    console.warn('RPC reconciliation failed:', error);
-                    console.error('Reconciliation failed:', error);
-                    updatePaymentStatusUI('error', 'Reconciliation failed - please contact support');
-                });
-            } else {
-                console.log('Transaction mismatch or no pending transaction');
-            }
+                    const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
+                    if (pending && (data.id === pending.id || data.erpTransactionRef === pending.erpTransactionRef)) {
+                        console.log('Matching transaction found, processing reconciliation...');
+                        
+                        // Add reconciliation timestamp
+                        data.reconciliation_time = new Date().toISOString();
+                        data.reconciled_by = 'odoo_pos_frontend';
+                        
+                        rpc.query({
+                            model: 'pos.payment.method',
+                            method: 'reconcile_payment',
+                            args: [data],
+                        }).then(function(result) {
+                            console.log('Reconciliation RPC result:', result);
+                            
+                            // Update UI, clear localStorage, log
+                            updatePaymentStatusUI(result.status, result.message);
+                            localStorage.removeItem('pending_transaction');
+                            // Set flag for polling to detect completion
+                            localStorage.setItem('reconciliation_complete', 'true');
+                            console.log('Reconciliation complete via RPC:', result);
+                        }).catch(function(error) {
+                            console.warn('RPC reconciliation failed:', error);
+                            console.error('Reconciliation failed:', error);
+                            updatePaymentStatusUI('error', 'Reconciliation failed - please contact support');
+                        });
+                    } else {
+                        console.log('Transaction mismatch or no pending transaction. Pending:', pending ? pending.id : 'none');
+                    }
+                }
+            });
+        }, function(error) {
+            console.error('Firestore listener error:', error);
         });
 
-        console.log('Firebase reconciliation listener set up successfully');
+        console.log('Firestore reconciliation listener set up successfully');
     }
 
     function updatePaymentStatusUI(status, message) {
@@ -110,15 +125,15 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _initializeFirebase: function() {
-            console.log('Initializing Firebase for PaymentSeerbit...');
+            console.log('Initializing Firestore for PaymentSeerbit...');
             FirebaseInit.initializeFirebase().then(function(success) {
                 if (success) {
-                    console.log('Firebase initialized successfully for Seerbit payments');
+                    console.log('Firestore initialized successfully for Seerbit payments');
                 } else {
-                    console.warn('Firebase initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
+                    console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
                 }
             }).catch(function(error) {
-                console.error('Firebase initialization error:', error);
+                console.error('Firestore initialization error:', error);
             });
         },
 
@@ -274,7 +289,7 @@ odoo.define('pos_seerbit.payment', function (require) {
 
             console.log('Sending payment request with payload:', payload);
 
-            // Send to backend to push to Firebase
+            // Send to backend to push to Firestore
             return rpc.query({
                 model: 'pos.payment.method',
                 method: 'send_seerbit_payment_request',

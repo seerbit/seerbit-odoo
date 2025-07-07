@@ -76,6 +76,12 @@ odoo-data/
 odoo-filestore/
 odoo-sessions/
 
+
+test_backend_firestore.py
+test_firestore.html
+test_implementation_verification.py
+
+
 # OS specific
 .DS_Store
 .DS_Store?

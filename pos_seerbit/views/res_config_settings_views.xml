@@ -23,27 +23,25 @@
                                 </div>
                             </div>
                             
-                            <!-- Firebase Configuration (only shown when Seerbit is enabled) -->
+                            <!-- Firestore Configuration (only shown when Seerbit is enabled) -->
                             <div class="col-12 col-lg-6 o_setting_box" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
                                 <div class="o_setting_left_pane"/>
                                 <div class="o_setting_right_pane">
-                                    <label for="seerbit_firebase_db_url" string="Firebase Database URL"/>
-                                    <field name="seerbit_firebase_db_url" placeholder="https://your-project.firebaseio.com"/>
                                     <label for="seerbit_firebase_api_key" string="Firebase API Key"/>
                                     <field name="seerbit_firebase_api_key" placeholder="AIzaSy..."/>
-                                    <label for="seerbit_firebase_project_id" string="Firebase Project ID"/>
-                                    <field name="seerbit_firebase_project_id" placeholder="your-project-id"/>
+                                    <label for="seerbit_firestore_project_id" string="Firestore Project ID"/>
+                                    <field name="seerbit_firestore_project_id" placeholder="your-project-id"/>
                                 </div>
                             </div>
                             
-                            <!-- Firebase Service Account JSON (only shown when Seerbit is enabled) -->
+                            <!-- Firestore Service Account JSON (only shown when Seerbit is enabled) -->
                             <div class="col-12 col-lg-6 o_setting_box" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
                                 <div class="o_setting_left_pane"/>
                                 <div class="o_setting_right_pane">
-                                    <label for="seerbit_firebase_cred" string="Firebase Service Account JSON"/>
-                                    <field name="seerbit_firebase_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
+                                    <label for="seerbit_firestore_cred" string="Firestore Service Account JSON"/>
+                                    <field name="seerbit_firestore_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
                                     <div class="text-muted mt8">
-                                        Paste the entire content of your Firebase service account JSON file here.
+                                        Paste the entire content of your Firestore service account JSON file here.
                                     </div>
                                 </div>
                             </div>

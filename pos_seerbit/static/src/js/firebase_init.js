@@ -1,6 +1,6 @@
 // pos_seerbit/static/src/js/firebase_init.js
-// This file assumes firebase-app.js and firebase-database.js are loaded via CDN in the manifest
-// and exposes firebaseApp and firebaseDb globally for use in other modules.
+// This file assumes firebase-app.js and firebase-firestore.js are loaded via CDN in the manifest
+// and exposes firebaseApp and firestoreDb globally for use in other modules.
 
 odoo.define('pos_seerbit.firebase_init', function (require) {
     "use strict";
@@ -11,7 +11,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
 
     // Global variables to track Firebase state
     var firebaseInitialized = false;
-    var firebaseDb = null;
+    var firestoreDb = null;
     var initializationPromise = null;
 
     /**
@@ -25,26 +25,26 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
         }
 
         // Return resolved promise if already initialized
-        if (firebaseInitialized && firebaseDb) {
+        if (firebaseInitialized && firestoreDb) {
             return Promise.resolve(true);
         }
 
-        console.log('Initializing Firebase...');
+        console.log('Initializing Firebase for Firestore...');
 
         initializationPromise = rpc.query({
             model: 'pos.payment.method',
-            method: 'get_firebase_config',
+            method: 'get_firestore_config',
             args: [],
         }).then(function(config) {
-            console.log('Firebase config received:', config);
+            console.log('Firestore config received:', config);
             
             if (!config) {
-                console.error('No Firebase configuration received from server');
+                console.error('No Firestore configuration received from server');
                 return false;
             }
 
-            if (!config.api_key || !config.database_url) {
-                console.error('Firebase configuration incomplete:', config);
+            if (!config.apiKey || !config.projectId) {
+                console.error('Firestore configuration incomplete:', config);
                 return false;
             }
 
@@ -58,9 +58,13 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
                 // Initialize Firebase if not already initialized
                 if (!firebase.apps || !firebase.apps.length) {
                     const firebaseConfig = {
-                        apiKey: config.api_key,
-                        databaseURL: config.database_url,
-                        projectId: config.project_id || 'default',
+                        apiKey: config.apiKey,
+                        projectId: config.projectId,
+                        // Add additional config for better compatibility
+                        authDomain: config.projectId + '.firebaseapp.com',
+                        storageBucket: config.projectId + '.appspot.com',
+                        // messagingSenderId: '123456789', // Placeholder
+                        // appId: '1:123456789:web:abcdef123456' // Placeholder
                     };
 
                     console.log('Initializing Firebase with config:', firebaseConfig);
@@ -70,14 +74,14 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
                     console.log('Firebase app already initialized');
                 }
 
-                // Make Firebase database available
-                if (firebase.database) {
-                    firebaseDb = firebase.database();
+                // Make Firestore database available
+                if (firebase.firestore) {
+                    firestoreDb = firebase.firestore();
                     firebaseInitialized = true;
-                    console.log('Firebase database initialized successfully');
+                    console.log('Firestore database initialized successfully');
                     return true;
                 } else {
-                    console.error('Firebase database module not available');
+                    console.error('Firestore module not available');
                     return false;
                 }
             } catch (error) {
@@ -85,7 +89,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
                 return false;
             }
         }).catch(function(error) {
-            console.error('Failed to get Firebase config from server:', error);
+            console.error('Failed to get Firestore config from server:', error);
             return false;
         }).finally(function() {
             // Clear the promise so it can be retried
@@ -99,22 +103,22 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
      * Check if Firebase is available and initialized
      */
     function isFirebaseAvailable() {
-        return firebaseInitialized && firebaseDb !== null;
+        return firebaseInitialized && firestoreDb !== null;
     }
 
     /**
-     * Get Firebase database reference
+     * Get Firestore database reference
      */
-    function getFirebaseDb() {
+    function getFirestoreDb() {
         if (!isFirebaseAvailable()) {
-            console.warn('Firebase not available. Initialization status:', {
+            console.warn('Firestore not available. Initialization status:', {
                 firebaseInitialized: firebaseInitialized,
-                firebaseDb: !!firebaseDb,
+                firestoreDb: !!firestoreDb,
                 firebaseSdk: typeof firebase !== 'undefined'
             });
             return null;
         }
-        return firebaseDb;
+        return firestoreDb;
     }
 
     /**
@@ -140,12 +144,8 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
             console.error('Invalid API key:', config.api_key);
             return false;
         }
-        if (!config.database_url || typeof config.database_url !== 'string') {
-            console.error('Invalid database URL:', config.database_url);
-            return false;
-        }
-        if (!config.database_url.startsWith('https://')) {
-            console.error('Database URL must start with https://:', config.database_url);
+        if (!config.project_id || typeof config.project_id !== 'string') {
+            console.error('Invalid project ID:', config.project_id);
             return false;
         }
         return true;
@@ -157,7 +157,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
     function reinitializeFirebase() {
         console.log('Forcing Firebase re-initialization...');
         firebaseInitialized = false;
-        firebaseDb = null;
+        firestoreDb = null;
         initializationPromise = null;
         return initializeFirebase();
     }
@@ -168,7 +168,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
     function getFirebaseStatus() {
         return {
             initialized: firebaseInitialized,
-            databaseAvailable: !!firebaseDb,
+            databaseAvailable: !!firestoreDb,
             sdkLoaded: typeof firebase !== 'undefined',
             appsCount: firebase && firebase.apps ? firebase.apps.length : 0
         };
@@ -177,7 +177,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
     return {
         initializeFirebase: initializeFirebase,
         isFirebaseAvailable: isFirebaseAvailable,
-        getFirebaseDb: getFirebaseDb,
+        getFirestoreDb: getFirestoreDb,
         getFirebaseApp: getFirebaseApp,
         validateFirebaseConfig: validateFirebaseConfig,
         reinitializeFirebase: reinitializeFirebase,

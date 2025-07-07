@@ -18,13 +18,13 @@ if 'firebase_admin' in sys.modules:
 
 try:
     import firebase_admin
-    from firebase_admin import credentials, db
-    FIREBASE_AVAILABLE = True
+    from firebase_admin import credentials, firestore
+    FIRESTORE_AVAILABLE = True
 except ImportError as e:
-    FIREBASE_AVAILABLE = False
+    FIRESTORE_AVAILABLE = False
     firebase_admin = None
     credentials = None
-    db = None
+    firestore = None
     logging.getLogger(__name__).warning("Firebase Admin SDK not available: %s", str(e))
 
 from odoo import _, api, fields, models
@@ -35,36 +35,40 @@ from odoo.addons.pos_seerbit.utils import format_erp_ref
 
 _logger = logging.getLogger(__name__)
 
-# Initialize Firebase only once
-_firebase_initialized = False
+# Initialize Firestore only once
+_firestore_initialized = False
 
-def initialize_firebase(env):
-    """Initialize Firebase with proper error handling"""
-    global _firebase_initialized
+def initialize_firestore(env):
+    """Initialize Firestore with proper error handling"""
+    global _firestore_initialized
 
-    # Check if Firebase is available
-    if not FIREBASE_AVAILABLE:
+    # Check if Firestore is available
+    if not FIRESTORE_AVAILABLE:
         _logger.warning("Firebase Admin SDK not available. Skipping initialization.")
         return False
 
-    if _firebase_initialized or firebase_admin._apps:
+    if _firestore_initialized or firebase_admin._apps:
         return True
 
     try:
-        # Get Firebase config from Odoo settings
+        # Get Firestore config from Odoo settings
         config = env['ir.config_parameter'].sudo()
-        cred_json = config.get_param('pos_seerbit.seerbit_firebase_cred')
-        db_url = config.get_param('pos_seerbit.seerbit_firebase_db_url')
+        cred_json = config.get_param('pos_seerbit.seerbit_firestore_cred')
+        project_id = config.get_param('pos_seerbit.seerbit_firestore_project_id')
 
-        if not cred_json or not db_url:
-            _logger.warning("Firebase configuration not available in settings. Skipping initialization.")
+        if not cred_json or not project_id:
+            _logger.warning("Firestore configuration not available in settings. Skipping initialization.")
             return False
 
-        # Validate JSON format
+        # Validate JSON format and service account structure
         try:
-            json.loads(cred_json)
+            cred_dict = json.loads(cred_json)
+            # Additional validation - check if it's a valid service account
+            if not isinstance(cred_dict, dict) or 'type' not in cred_dict or cred_dict['type'] != 'service_account':
+                _logger.error("Invalid service account format in Firestore credentials")
+                return False
         except json.JSONDecodeError:
-            _logger.error("Invalid JSON format in Firebase service account credentials")
+            _logger.error("Invalid JSON format in Firestore service account credentials")
             return False
 
         # Save credentials to a temporary file
@@ -76,12 +80,11 @@ def initialize_firebase(env):
 
         try:
             cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred, 
-                                          {
-                                              'databaseURL': db_url
-                                          })
-            _firebase_initialized = True
-            _logger.info("Firebase initialized successfully")
+            firebase_admin.initialize_app(cred, {
+                'projectId': project_id
+            })
+            _firestore_initialized = True
+            _logger.info("Firestore initialized successfully with project: %s", project_id)
             return True
         finally:
             # Clean up the temporary file
@@ -91,42 +94,53 @@ def initialize_firebase(env):
                 pass  # File might already be deleted
                 
     except Exception as e:
-        _logger.warning("Failed to initialize Firebase: %s", str(e))
+        _logger.warning("Failed to initialize Firestore: %s", str(e))
         return False
 
-# Try to initialize Firebase on module load
+# Try to initialize Firestore on module load
 # Note: This will only work if the module is enabled and configured
 try:
-    # We need an environment to initialize Firebase
+    # We need an environment to initialize Firestore
     # This will be done when the first payment method is accessed
     pass
 except Exception as e:
-    _logger.debug("Firebase initialization deferred: %s", str(e))
+    _logger.debug("Firestore initialization deferred: %s", str(e))
 
 
-def send_to_firebase_transactions(env, payload):
+def send_to_firestore_transactions(env, payload):
     """
-    Send payment request to Firebase.
+    Send payment request to Firestore.
     """
-    # Check if Firebase is available
-    if not FIREBASE_AVAILABLE:
+    # Check if Firestore is available
+    if not FIRESTORE_AVAILABLE:
         _logger.warning("Firebase Admin SDK not available. Cannot send payment request.")
         return False
     
-    if not initialize_firebase(env):
-        _logger.warning("Firebase not initialized. Cannot send payment request.")
+    if not initialize_firestore(env):
+        _logger.warning("Firestore not initialized. Cannot send payment request.")
         return False
     
     try:
-        _logger.info('Sending payment request to Firebase: %s',
+        _logger.info('Sending payment request to Firestore: %s',
                      pprint.pformat(payload))
-        ref = db.reference('transactions')
-        ref.push(payload)
-        _logger.info('Sent payment request to Firebase: %s',
-                     pprint.pformat(payload))
+        
+        # Get Firestore client
+        db = firestore.client()
+        
+        # Add timestamp for better tracking
+        payload['timestamp'] = firestore.SERVER_TIMESTAMP
+        payload['created_by'] = 'odoo_pos_seerbit'
+        payload['created_time'] = fields.Datetime.now().isoformat()
+        
+        # Add to transactions collection
+        doc_ref = db.collection('transactions').document()
+        doc_ref.set(payload)
+        
+        _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
+        _logger.info('Payload sent: %s', pprint.pformat(payload))
         return True
     except Exception as e:
-        _logger.error("Failed to send payment request to Firebase: %s", str(e))
+        _logger.error("Failed to send payment request to Firestore: %s", str(e))
         return False
 
 
@@ -194,15 +208,15 @@ class PosPaymentMethod(models.Model):
         self.seerbit_latest_response = json.dumps(payload)
         self.env.cr.commit()
         
-        # Try to send to Firebase
-        firebase_success = send_to_firebase_transactions(self.env, payload)
+        # Try to send to Firestore
+        firestore_success = send_to_firestore_transactions(self.env, payload)
         
-        if firebase_success:
+        if firestore_success:
             _logger.info(
-                "Seerbit payment request saved to Odoo and sent to Firebase: %s", pprint.pformat(payload))
+                "Seerbit payment request saved to Odoo and sent to Firestore: %s", pprint.pformat(payload))
         else:
             _logger.warning(
-                "Seerbit payment request saved to Odoo but Firebase send failed: %s", pprint.pformat(payload))
+                "Seerbit payment request saved to Odoo but Firestore send failed: %s", pprint.pformat(payload))
         
         return False
 
@@ -374,12 +388,12 @@ class PosPaymentMethod(models.Model):
             _logger.error("Error creating payment record: %s", str(e))
 
     @api.model
-    def get_firebase_config(self):
+    def get_firestore_config(self):
         """
-        Get Firebase configuration for frontend.
-        This method is called by the frontend to get the Firebase config.
+        Get Firestore configuration for frontend.
+        This method is called by the frontend to get the Firestore config.
 
         Returns:
-            dict: Firebase configuration for frontend
+            dict: Firestore configuration for frontend
         """
-        return self.env['res.config.settings'].sudo().get_firebase_config_for_frontend()
+        return self.env['res.config.settings'].sudo().get_firestore_config_for_frontend()

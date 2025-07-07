@@ -4,5 +4,9 @@
         <field name="name">Seerbit</field>
         <field name="type">bank</field>
         <field name="code">SEER</field>
+        <field name="currency_id" ref="base.NGN"/>
+        <field name="default_account_id" ref="account.data_account_type_liquidity"/>
+        <field name="show_on_dashboard" eval="True"/>
+        <field name="active" eval="True"/>
     </record>
 </odoo>

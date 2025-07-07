@@ -3,14 +3,14 @@
     "name": "Seerbit Odoo Point of Sale",
     "version": "0.1.4",
     "category": "Sales/Point of Sale",
-    "summary": "Integrate your POS with a Seerbit payment terminal using Firebase for real-time payment and reconciliation.",
+    "summary": "Integrate your POS with a Seerbit payment terminal with real-time payment and reconciliation.",
     "description": """
         Seerbit Odoo Point of Sale Integration
         
         This module integrates Seerbit payment terminals with Odoo Point of Sale.
         Features:
         - Real-time payment processing
-        - Firebase integration for payment reconciliation
+        - Firestore integration for payment reconciliation
         - Automatic payment status updates
         - Configurable through Odoo settings
     """,
@@ -31,12 +31,10 @@
     "application": False,
     "auto_install": False,
     "assets": {
-        # Option 1: Current setup (RECOMMENDED)
-        # Firebase in web.assets_backend for global availability
+        # Firestore SDK - Local files for better reliability
         "web.assets_backend": [
-            # Firebase SDK - Local files for better reliability
-            "pos_seerbit/static/lib/firebase/firebase-app-compat.js",
-            "pos_seerbit/static/lib/firebase/firebase-database-compat.js",
+            "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
+            "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
         ],
         "point_of_sale.assets": [
             # Seerbit assets
@@ -44,11 +42,14 @@
             "pos_seerbit/static/src/scss/**/*",
             "pos_seerbit/static/src/xml/**/*",
         ],
-        
     },
     "license": "OPL-1",
     "images": ["static/description/seerbit.gif"],
     "external_dependencies": {
-        "python": ["firebase-admin"],
+        "python": [
+            "firebase-admin>=6.2.0",
+            "google-cloud-firestore>=2.11.0",
+            "google-auth>=2.17.0",
+        ],
     },
 }
