@@ -47,9 +47,9 @@
     "images": ["static/description/seerbit.gif"],
     "external_dependencies": {
         "python": [
-            "firebase-admin>=6.2.0",
-            "google-cloud-firestore>=2.11.0",
-            "google-auth>=2.17.0",
+            "firebase-admin>=2.0.0",
+            "google-cloud-firestore>=2.0.0",
+            "google-auth>=2.0.0",
         ],
     },
 }

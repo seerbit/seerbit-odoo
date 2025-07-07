@@ -20,6 +20,15 @@ try:
     import firebase_admin
     from firebase_admin import credentials, firestore
     FIRESTORE_AVAILABLE = True
+    
+    # Check firebase-admin version for compatibility
+    try:
+        import pkg_resources
+        firebase_version = pkg_resources.get_distribution("firebase-admin").version
+        _logger.info("Firebase Admin SDK version: %s", firebase_version)
+    except Exception:
+        _logger.info("Firebase Admin SDK version: unknown")
+        
 except ImportError as e:
     FIRESTORE_AVAILABLE = False
     firebase_admin = None
