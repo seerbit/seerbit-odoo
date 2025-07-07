@@ -76,9 +76,7 @@ def initialize_firebase(env):
 
         try:
             cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': db_url
-            })
+            firebase_admin.initialize_app(cred, name='[DEFAULT]')
             _firebase_initialized = True
             _logger.info("Firebase initialized successfully")
             return True
