@@ -231,49 +231,59 @@ odoo.define('pos_seerbit.payment', function (require) {
                 } catch (error) {
                     console.error('Error parsing completed transaction:', error);
                     localStorage.removeItem('completed_transaction');
+                    let line = this.pending_seerbit_line();
+                        if (line) {
+                            line.set_payment_status('errorSeerbit');
+                        };
+                        this._show_error(
+                            _t('Error Marking payment as done'),
+                            'Odoo Error'
+                        );
+                        reject();
                 }
             }
+            line.set_payment_status('waitingSeerbit');
 
             // Fallback to original polling method for backward compatibility
-            return rpc.query({
-                model: 'pos.payment.method',
-                method: 'get_latest_seerbit_status',
-                args: [[this.payment_method.id], self._seerbit_pay_data()],
-            }, {
-                timeout: 3000,
-                shadow: true,
-            }).then(function (status) {
-                console.log(status);
-                var notification = status.latest_response;
-                var line = self.pending_seerbit_line();
-                if (line) {
-                    if (line.payment_status == 'done') {
-                    } else if (notification) {
-                        // A matching payment has been received
-                        line.set_receipt_info('Session ID: ' + notification.data.reference);
-                        line.transaction_id = notification.data.reference;
-                        line.card_type = notification.data.channelType;
-                        line.cardholder_name = notification.data.fullname;
-                        resolve(true);
-                    } else {
-                        line.set_payment_status('waitingSeerbit');
-                    }
-                } else {
-                    console.log("Cancelling");
-                    reject();
-                }
-            }).catch(error => {
-                console.log(error);
-                let line = this.pending_seerbit_line();
-                if (line) {
-                    line.set_payment_status('errorSeerbit');
-                };
-                this._show_error(
-                    _t('Could not connect to the Odoo server, please check your internet connection and try again.'),
-                    'Odoo Server Error'
-                );
-                reject();
-            });
+            // return rpc.query({
+            //     model: 'pos.payment.method',
+            //     method: 'get_latest_seerbit_status',
+            //     args: [[this.payment_method.id], self._seerbit_pay_data()],
+            // }, {
+            //     timeout: 3000,
+            //     shadow: true,
+            // }).then(function (status) {
+            //     console.log(status);
+            //     var notification = status.latest_response;
+            //     var line = self.pending_seerbit_line();
+            //     if (line) {
+            //         if (line.payment_status == 'done') {
+            //         } else if (notification) {
+            //             // A matching payment has been received
+            //             line.set_receipt_info('Session ID: ' + notification.data.reference);
+            //             line.transaction_id = notification.data.reference;
+            //             line.card_type = notification.data.channelType;
+            //             line.cardholder_name = notification.data.fullname;
+            //             resolve(true);
+            //         } else {
+            //             line.set_payment_status('waitingSeerbit');
+            //         }
+            //     } else {
+            //         console.log("Cancelling");
+            //         reject();
+            //     }
+            // }).catch(error => {
+            //     console.log(error);
+            //     let line = this.pending_seerbit_line();
+            //     if (line) {
+            //         line.set_payment_status('errorSeerbit');
+            //     };
+            //     this._show_error(
+            //         _t('Could not connect to the Odoo server, please check your internet connection and try again.'),
+            //         'Odoo Server Error'
+            //     );
+            //     reject();
+            // });
         },
 
         _show_error: function (msg, title) {

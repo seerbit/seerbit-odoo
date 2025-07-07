@@ -225,9 +225,6 @@ class PosPaymentMethod(models.Model):
     def send_seerbit_payment_request(self, payload):
         self.ensure_one()
         
-        # Save to Odoo for tracking first
-        self.seerbit_latest_response = json.dumps(payload)
-        self.env.cr.commit()
         
         # Try to send to Firestore
         firestore_success = send_to_firestore_transactions(self.env, payload)
