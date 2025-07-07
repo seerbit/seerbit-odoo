@@ -9,106 +9,8 @@ odoo.define('pos_seerbit.payment', function (require) {
 
     // Import Firebase initialization
     var FirebaseInit = require('pos_seerbit.firebase_init');
-
-    function listenForReconciliation(transactionId) {
-        console.log('Setting up reconciliation listener for transaction:', transactionId);
-        
-        // Ensure Firebase is initialized
-        if (!FirebaseInit.isFirebaseAvailable()) {
-            console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
-            
-            // Try to reinitialize Firebase
-            FirebaseInit.reinitializeFirebase().then(function(success) {
-                if (success) {
-                    console.log('Firestore reinitialized successfully, setting up listener');
-                    listenForReconciliation(transactionId);
-                } else {
-                    console.error('Failed to reinitialize Firestore');
-                }
-            });
-            return;
-        }
-
-        const firestoreDb = FirebaseInit.getFirestoreDb();
-        if (!firestoreDb) {
-            console.warn('Firestore database not available for reconciliation');
-            return;
-        }
-
-        console.log('Setting up Firestore reconciliation listener...');
-        
-        // Listen for new documents in reconciliations collection
-        const reconciliationsRef = firestoreDb.collection('reconciliations');
-        const unsubscribe = reconciliationsRef.onSnapshot(function(snapshot) {
-            console.log('Reconciliation snapshot received with', snapshot.docChanges().length, 'changes');
-            
-            snapshot.docChanges().forEach(function(change) {
-                if (change.type === 'added') {
-                    const data = change.doc.data();
-                    console.log('Reconciliation data received:', data);
-
-                    const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                    if (pending && data.id === pending.id) {
-                        console.log('Matching transaction found, processing reconciliation...');
-                        
-                        // Add reconciliation timestamp
-                        data.reconciliation_time = new Date().toISOString();
-                        data.reconciled_by = 'odoo_pos_frontend';
-                        
-                        // Ensure all reconciliation data is properly formatted
-                        const reconciliationData = {
-                            'id': data.id || '',
-                            'transactionValue': data.transactionValue || '',
-                            'receivedDateTime': data.receivedDateTime || '',
-                            'status': data.status || '',
-                            'transactionTime': data.transactionTime || '',
-                            'posid': data.posid || '',
-                            'transactionRef': data.transactionRef || '',
-                            'reconciliation_time': data.reconciliation_time,
-                            'reconciled_by': data.reconciled_by
-                        };
-                        
-                        rpc.query({
-                            model: 'pos.payment.method',
-                            method: 'reconcile_payment',
-                            args: [reconciliationData],
-                        }).then(function(result) {
-                            console.log('Reconciliation RPC result:', result);
-                            
-                            // Update UI and clear localStorage
-                            updatePaymentStatusUI(result.status, result.message);
-                            localStorage.removeItem('pending_transaction');
-                            localStorage.setItem('reconciliation_complete', 'true');
-                        }).catch(function(error) {
-                            console.error('Reconciliation failed:', error);
-                            updatePaymentStatusUI('error', 'Reconciliation failed');
-                        });
-                    }
-                }
-            });
-        }, function(error) {
-            console.error('Firestore listener error:', error);
-        });
-    }
-
-    function updatePaymentStatusUI(status, message) {
-        // Updated to handle "completed" status from Firestore
-        if (status === 'success' || status === 'completed') {
-            Gui.showPopup('ConfirmPopup', {
-                title: _t('Payment Successful'),
-                body: message || _t('The payment was successfully reconciled.'),
-            });
-        } else if (status === 'failed') {
-            Gui.showPopup('ErrorPopup', {
-                title: _t('Payment Failed'),
-                body: message || _t('The payment was not successfully reconciled.'),
-            });
-        } else if (status === 'error') {
-            console.log('Payment error:', message);
-        } else {
-            console.log('Payment status:', status, message);
-        }
-    }
+    // Import Firebase listener
+    var FirebaseListener = require('pos_seerbit.firebase_listener');
 
     var PaymentSeerbit = PaymentInterface.extend({
         init: function() {
@@ -136,210 +38,30 @@ odoo.define('pos_seerbit.payment', function (require) {
             });
         },
 
-        // Override to prevent standard payment terminal UI
         send_payment_request: function (cid) {
-            console.log('PaymentSeerbit: send_payment_request called with cid:', cid);
+            this._super.apply(this, arguments);
             this._reset_state();
             return this._seerbit_pay(cid);
         },
-
         send_payment_cancel: function (order, cid) {
-            console.log('PaymentSeerbit: send_payment_cancel called');
+            this._super.apply(this, arguments);
             return this._seerbit_cancel();
         },
-
         close: function () {
-            console.log('PaymentSeerbit: close called');
             this._seerbit_cancel();
+            this._super.apply(this, arguments);
         },
 
-        // Override to prevent standard terminal UI display
-        show_payment_terminal_ui: function() {
-            console.log('PaymentSeerbit: show_payment_terminal_ui called - preventing standard UI');
-            // Return false to prevent standard terminal UI from showing
-            return false;
-        },
-
-        // Override to prevent transaction cancelled display
-        show_transaction_cancelled: function() {
-            console.log('PaymentSeerbit: show_transaction_cancelled called - preventing standard display');
-            // Return false to prevent standard cancelled display
-            return false;
-        },
-
-        // Override to prevent standard error display
-        show_payment_error: function(error) {
-            console.log('PaymentSeerbit: show_payment_error called - preventing standard error display');
-            // Return false to prevent standard error display
-            return false;
-        },
-
-        // Override to prevent standard status updates
-        update_payment_status: function(status) {
-            console.log('PaymentSeerbit: update_payment_status called with status:', status);
-            // Don't call super - prevent standard status updates
-            return false;
-        },
-
-        // Override to prevent standard terminal status
-        get_terminal_status: function() {
-            console.log('PaymentSeerbit: get_terminal_status called - returning custom status');
-            // Return custom status to prevent standard terminal status
-            return 'waitingSeerbit';
-        },
-
-        // Override to prevent standard terminal display
-        is_terminal_ready: function() {
-            console.log('PaymentSeerbit: is_terminal_ready called - returning true to prevent standard UI');
-            // Return true to prevent standard terminal UI from showing
-            return true;
-        },
-
-        // Override to prevent standard payment terminal popup
-        show_payment_terminal_popup: function() {
-            console.log('PaymentSeerbit: show_payment_terminal_popup called - preventing standard popup');
-            // Return false to prevent standard popup
-            return false;
-        },
-
-        // Override to prevent standard payment terminal status display
-        show_payment_terminal_status: function(status) {
-            console.log('PaymentSeerbit: show_payment_terminal_status called - preventing standard status display');
-            // Return false to prevent standard status display
-            return false;
-        },
-
-        // Override to prevent standard payment terminal error display
-        show_payment_terminal_error: function(error) {
-            console.log('PaymentSeerbit: show_payment_terminal_error called - preventing standard error display');
-            // Return false to prevent standard error display
-            return false;
-        },
-
-        // Override to prevent standard payment terminal success display
-        show_payment_terminal_success: function() {
-            console.log('PaymentSeerbit: show_payment_terminal_success called - preventing standard success display');
-            // Return false to prevent standard success display
-            return false;
-        },
-
-        // Override to prevent standard payment terminal registration
-        register_payment_terminal: function() {
-            console.log('PaymentSeerbit: register_payment_terminal called - preventing standard registration');
-            // Return false to prevent standard registration
-            return false;
-        },
-
-        // Override to prevent standard payment terminal initialization
-        initialize_payment_terminal: function() {
-            console.log('PaymentSeerbit: initialize_payment_terminal called - preventing standard initialization');
-            // Return false to prevent standard initialization
-            return false;
-        },
-
-        // Override to prevent standard payment terminal display
-        display_payment_terminal: function() {
-            console.log('PaymentSeerbit: display_payment_terminal called - preventing standard display');
-            // Return false to prevent standard display
-            return false;
-        },
-
-        // Add the missing start_get_status_polling method
-        start_get_status_polling: function() {
-            console.log('PaymentSeerbit: start_get_status_polling called');
-            return new Promise((resolve, reject) => {
-                const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                if (!pending) {
-                    console.log('No pending transaction found');
-                    resolve(false);
-                    return;
-                }
-
-                console.log('Starting polling for transaction:', pending.id);
-                console.log('Pending transaction data:', pending);
-
-                // Set up polling to check for reconciliation
-                const checkStatus = () => {
-                    if (this.was_cancelled) {
-                        console.log('Polling cancelled by user');
-                        clearTimeout(this.polling);
-                        resolve(false);
-                        return;
-                    }
-
-                    // Check if reconciliation has occurred
-                    const reconciled = localStorage.getItem('reconciliation_complete');
-                    if (reconciled) {
-                        console.log('Reconciliation detected, stopping polling');
-                        clearTimeout(this.polling);
-                        localStorage.removeItem('reconciliation_complete');
-                        resolve(true);
-                        return;
-                    }
-
-                    console.log('Polling check - no reconciliation yet, continuing...');
-                    // Continue polling every 2 seconds
-                    this.polling = setTimeout(checkStatus, 2000);
-                };
-
-                // Start polling
-                checkStatus();
-
-                // Set a timeout to stop polling after 10 minutes
-                setTimeout(() => {
-                    if (this.polling) {
-                        console.log('Polling timeout reached');
-                        clearTimeout(this.polling);
-                    }
-                }, 600000); // 10 minutes
-            });
-        },
-
-        pending_seerbit_line: function() {
-            const order = this.pos.get_order();
-            if (!order?.paymentlines) return null;
-            
-            return order.paymentlines.find(
-                paymentLine => paymentLine?.payment_method?.use_payment_terminal === 'seerbit' && 
-                              !paymentLine.is_done()
-            );
-        },
-
-        // Trigger handlers for UI buttons
-        send_force_done: function (line) {
-            // Force mark payment as done (for manual override)
-            if (line?.set_payment_status) {
-                line.set_payment_status('done');
-                // Clear any pending transaction
-                localStorage.removeItem('pending_transaction');
-                localStorage.removeItem('reconciliation_complete');
-                // Stop any polling
-                if (this.polling) {
-                    clearTimeout(this.polling);
-                    this.polling = null;
-                }
-                this._show_error(_t('Payment manually confirmed.'), _t('Manual Override'));
-            }
-        },
-
-        send_payment_request_retry: function (line) {
-            // Retry sending payment request
-            const order = this.pos.get_order();
-            if (!order || !line?.cid) return;
-            
-            console.log('Retrying payment request for line:', line.cid);
-            const cid = line.cid;
-            this._reset_state();
-            return this._seerbit_pay(cid);
+        pending_seerbit_line() {
+            return this.pos.get_order().paymentlines.find(
+                paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' && (!paymentLine.is_done()));
         },
 
         // private methods
         _reset_state: function () {
             this.was_cancelled = false;
-            if (this.polling) {
-                clearTimeout(this.polling);
-                this.polling = null;
-            }
+            this.remaining_polls = 4;
+            clearTimeout(this.polling);
         },
 
         _seerbit_pay_data: function () {
@@ -385,6 +107,27 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _seerbit_pay: function (cid) {
+            var order = this.pos.get_order();
+
+            if (order.selected_paymentline.amount < 0.01) {
+                this._show_error(_t('Cannot process transactions with invalid amount.'),
+                    'Amount Error');
+                return Promise.resolve();
+            }
+
+            if (order === this.poll_error_order) {
+                delete this.poll_error_order;
+                return Promise.resolve();
+            }
+
+            var line = order.paymentlines.find(paymentLine => paymentLine.cid === cid);
+            line.set_payment_status('waitingSeerbit');
+            
+            // Send payment request to Firestore instead of webhook
+            return this._send_payment_request_to_firestore(cid);
+        },
+
+        _send_payment_request_to_firestore: function(cid) {
             const order = this.pos.get_order();
             if (!order) {
                 console.error('No order available for payment');
@@ -409,20 +152,14 @@ odoo.define('pos_seerbit.payment', function (require) {
             }).then(() => {
                 console.log('Payment request sent successfully');
                 
-                // Save to localStorage for recovery
+                // Save to localStorage for tracking
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
                 
-                // Start listening for reconciliation
-                listenForReconciliation(payload.id);
+                // Start Firebase listener for reconciliation
+                FirebaseListener.listenForReconciliation(payload.id);
                 
-                // Set UI to waiting
-                const line = order.paymentlines?.find(paymentLine => paymentLine.cid === cid);
-                if (line?.set_payment_status) {
-                    line.set_payment_status('waitingSeerbit');
-                    console.log('Payment request sent and waiting for reconciliation');
-                }
-                
-                return Promise.resolve();
+                // Start polling for completion
+                return this.start_get_status_polling();
             }).catch((error) => {
                 console.error('Payment request failed:', error);
                 
@@ -440,12 +177,103 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _seerbit_cancel: function () {
-            console.log('PaymentSeerbit: _seerbit_cancel called');
-            this.was_cancelled = true;
-            if (this.polling) {
-                clearTimeout(this.polling);
-                this.polling = null;
+            this.was_cancelled = !!this.polling;
+        },
+
+        start_get_status_polling() {
+            var self = this;
+            var res = new Promise(function (resolve, reject) {
+                // clear previous intervals just in case, otherwise
+                // it'll run forever
+                clearTimeout(self.polling);
+                self._poll_for_response(resolve, reject);
+                self.polling = setInterval(function () {
+                    self._poll_for_response(resolve, reject);
+                }, 3500);
+            });
+
+            // make sure to stop polling when we're done
+            res.finally(function () {
+                self._reset_state();
+            });
+            return res;
+        },
+
+        _poll_for_response: function (resolve, reject) {
+            var self = this;
+            if (this.was_cancelled || !this.pos.get_order().selected_paymentline) {
+                return resolve(true);
             }
+
+            // Check localStorage for completed transaction first
+            const completedTransaction = localStorage.getItem('completed_transaction');
+            if (completedTransaction) {
+                try {
+                    const transactionData = JSON.parse(completedTransaction);
+                    console.log('Found completed transaction in localStorage:', transactionData);
+                    
+                    var line = self.pending_seerbit_line();
+                    if (line) {
+                        // Mark payment as done
+                        line.set_payment_status('done');
+                        line.set_receipt_info('Transaction ID: ' + transactionData.id);
+                        line.transaction_id = transactionData.id;
+                        line.card_type = 'Seerbit';
+                        line.cardholder_name = 'Seerbit Payment';
+                        
+                        // Clear localStorage
+                        localStorage.removeItem('completed_transaction');
+                        localStorage.removeItem('pending_transaction');
+                        
+                        resolve(true);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error parsing completed transaction:', error);
+                    localStorage.removeItem('completed_transaction');
+                }
+            }
+
+            // Fallback to original polling method for backward compatibility
+            return rpc.query({
+                model: 'pos.payment.method',
+                method: 'get_latest_seerbit_status',
+                args: [[this.payment_method.id], self._seerbit_pay_data()],
+            }, {
+                timeout: 3000,
+                shadow: true,
+            }).then(function (status) {
+                console.log(status);
+                var notification = status.latest_response;
+                var line = self.pending_seerbit_line();
+                if (line) {
+                    if (line.payment_status == 'done') {
+                    } else if (notification) {
+                        // A matching payment has been received
+                        line.set_receipt_info('Session ID: ' + notification.data.reference);
+                        line.transaction_id = notification.data.reference;
+                        line.card_type = notification.data.channelType;
+                        line.cardholder_name = notification.data.fullname;
+                        resolve(true);
+                    } else {
+                        line.set_payment_status('waitingSeerbit');
+                    }
+                } else {
+                    console.log("Cancelling");
+                    reject();
+                }
+            }).catch(error => {
+                console.log(error);
+                let line = this.pending_seerbit_line();
+                if (line) {
+                    line.set_payment_status('errorSeerbit');
+                };
+                this._show_error(
+                    _t('Could not connect to the Odoo server, please check your internet connection and try again.'),
+                    'Odoo Server Error'
+                );
+                reject();
+            });
         },
 
         _show_error: function (msg, title) {
@@ -459,6 +287,5 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
     });
 
-    console.log('PaymentSeerbit class defined with methods:', Object.getOwnPropertyNames(PaymentSeerbit.prototype));
     return PaymentSeerbit;
 });
