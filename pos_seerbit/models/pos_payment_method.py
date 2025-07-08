@@ -186,22 +186,24 @@ class PosPaymentMethod(models.Model):
         groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
-    @api.constrains("seerbit_public_key", "seerbit_terminal_id")
+    @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
             if not (payment_method.seerbit_public_key and payment_method.seerbit_terminal_id):
                 continue
             # Payment methods are now expected to separate at the account levels irrepective of the number of terminals
+            
             existing_key = self.search(
-                [("id", "!=", payment_method.id), ("seerbit_public_key",
-                                                   "=", payment_method.seerbit_public_key)],
+                [("id", "!=", payment_method.id), ("seerbit_terminal_id",
+                                                   "=", payment_method.seerbit_terminal_id)],
                 limit=1,
             )
         
             if existing_key:
+                # Restricting duplicate terminals
                 raise ValidationError(
-                    _("Seerbit key %s is already used on payment method %s.")
-                    % (payment_method.seerbit_public_key, existing_key.display_name)
+                    _("Seerbit terminal %s is already used on payment method %s.")
+                    % (payment_method.seerbit_terminal_id, existing_key.display_name)
                 )
 
     def _is_write_forbidden(self, fields):
