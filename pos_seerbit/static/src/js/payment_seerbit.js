@@ -242,7 +242,10 @@ odoo.define('pos_seerbit.payment', function (require) {
                         reject();
                 }
             }
-            line.set_payment_status('waitingSeerbit');
+             let line = this.pending_seerbit_line();
+                if (line) {
+                        line.set_payment_status('waitingSeerbit');
+        };
 
             // Fallback to original polling method for backward compatibility
             // return rpc.query({
