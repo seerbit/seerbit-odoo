@@ -29,14 +29,14 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
             return Promise.resolve(true);
         }
 
-        console.log('Initializing Firebase for Firestore...');
+        // Initializing Firebase for Firestore
 
         initializationPromise = rpc.query({
             model: 'pos.payment.method',
             method: 'get_firestore_config',
             args: [],
         }).then(function(config) {
-            console.log('Firestore config received:', config);
+            // Firestore config received
             
             if (!config) {
                 console.error('No Firestore configuration received from server');
@@ -67,18 +67,18 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
                         // appId: '1:123456789:web:abcdef123456' // Placeholder
                     };
 
-                    console.log('Initializing Firebase with config:', firebaseConfig);
+                    // Initializing Firebase with config
                     firebase.initializeApp(firebaseConfig);
-                    console.log('Firebase app initialized successfully');
+                    // Firebase app initialized successfully
                 } else {
-                    console.log('Firebase app already initialized');
+                                          // Firebase app already initialized
                 }
 
                 // Make Firestore database available
                 if (firebase.firestore) {
                     firestoreDb = firebase.firestore();
                     firebaseInitialized = true;
-                    console.log('Firestore database initialized successfully');
+                    // Firestore database initialized successfully
                     return true;
                 } else {
                     console.error('Firestore module not available');
@@ -155,7 +155,7 @@ odoo.define('pos_seerbit.firebase_init', function (require) {
      * Force re-initialization of Firebase
      */
     function reinitializeFirebase() {
-        console.log('Forcing Firebase re-initialization...');
+        // Forcing Firebase re-initialization
         firebaseInitialized = false;
         firestoreDb = null;
         initializationPromise = null;

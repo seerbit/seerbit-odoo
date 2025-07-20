@@ -7,12 +7,12 @@
     Seerbit Odoo Point of Sale</a><br/>
 </h1>
 <h2 align="center">
-An Odoo Integration for Seerbit POS Terminal (Now with Firebase Reconciliation)
+An Odoo Integration for Seerbit POS Terminal 
 </h2>
 
 ## Version: 0.1.3
 
-> **Note:** As of v0.1.3, this module uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. Payment requests are sent to the `transactions` collection, and reconciliation events are received from the `reconciliations` collection via Firebase listeners in the POS frontend.
+> **Note:** As of v0.1.3, this module uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
 
 ## How to Use
 

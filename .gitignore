@@ -54,6 +54,7 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+tests/
 
 # Linting and formatting
 .mypy_cache/
@@ -148,7 +149,7 @@ docker-compose.override.yml
 *.swo
 *~
 
-# Firebase
-service-account-write.json
 
-
+requirements-dev.txt
+.pre-commit-config.yaml
+pyproject.toml

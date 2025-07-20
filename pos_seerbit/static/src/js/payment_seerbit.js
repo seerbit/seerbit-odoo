@@ -19,17 +19,17 @@ odoo.define('pos_seerbit.payment', function (require) {
             this.was_cancelled = false;
             this.supports_reversals = false; // Seerbit doesn't support reversals
             
-            console.log('PaymentSeerbit initialized');
+            // PaymentSeerbit initialized
             
             // Initialize Firebase when payment interface is created
             this._initializeFirebase();
         },
 
         _initializeFirebase: function() {
-            console.log('Initializing Firestore for PaymentSeerbit...');
+            // Initializing Firestore for PaymentSeerbit
             FirebaseInit.initializeFirebase().then(function(success) {
                 if (success) {
-                    console.log('Firestore initialized successfully for Seerbit payments');
+                    // Firestore initialized successfully for Seerbit payments
                 } else {
                     console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
                 }
@@ -142,7 +142,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 return Promise.reject(error);
             }
 
-            console.log('Sending payment request with payload:', payload);
+            // Sending payment request with payload
 
             // Send to backend to push to Firestore
             return rpc.query({
@@ -150,7 +150,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 method: 'send_seerbit_payment_request',
                 args: [[order.selected_paymentline?.payment_method?.id], payload],
             }).then(() => {
-                console.log('Payment request sent successfully');
+                // Payment request sent successfully
                 
                 // Save to localStorage for tracking
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
@@ -210,7 +210,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             if (completedTransaction) {
                 try {
                     const transactionData = JSON.parse(completedTransaction);
-                    console.log('Found completed transaction in localStorage:', transactionData);
+                    // Found completed transaction in localStorage
                     
                     var line = self.pending_seerbit_line();
                     if (line) {
