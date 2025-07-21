@@ -52,7 +52,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             this._super.apply(this, arguments);
         },
 
-        pending_seerbit_line() {
+        pending_seerbit_line: function() {
             return this.pos.get_order().paymentlines.find(
                 paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' && (!paymentLine.is_done()));
         },
@@ -180,7 +180,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             this.was_cancelled = !!this.polling;
         },
 
-        start_get_status_polling() {
+        start_get_status_polling: function() {
             var self = this;
             var res = new Promise(function (resolve, reject) {
                 // clear previous intervals just in case, otherwise
