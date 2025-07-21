@@ -84,12 +84,15 @@ After installing the module, you need to configure it from the Odoo settings.
 
 1.  Go to **Settings > General Settings > Seerbit**.
 2.  Enable the **Seerbit Payment Terminal**.
-3.  Fill in the Firebase credentials:
-    *   **Firebase Service Account JSON**: Paste the content of your Firebase service account JSON file.
-    *   **Firebase Database URL**: The URL of your Firebase Realtime Database.
-    *   **Firebase API Key**: The API key for your Firebase project.
-    *   **Firebase Project ID**: The Project ID of your Firebase project.
-4.  Click **Save**.
+3.  **Obtain your Firebase credentials from Seerbit** 
+Seerbit will provide:
+    *   **Firebase Service Account JSON**
+    *   **Firebase API Key**
+    *   **Firebase Project ID**
+4.  Enter these credentials in the corresponding fields.
+5.  Click **Save**.
+
+> **Important:** Only use the credentials provided by Seerbit for your merchant account. Do not attempt to generate your own Firebase credentials.
 
 ### Seerbit Setup
 

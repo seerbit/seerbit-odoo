@@ -30,6 +30,7 @@
     "installable": True,
     "application": False,
     "auto_install": False,
+    "post_init_hook": "post_init_hook",
     "assets": {
         # Firestore SDK - Local files for better reliability
         "web.assets_backend": [
