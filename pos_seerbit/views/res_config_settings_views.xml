@@ -15,13 +15,13 @@
                                     Enable Seerbit payment terminal integration.
                                 </div>
                             </setting>
-                            <setting string="Seerbit Firebase API Key" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
+                            <setting string="Seerbit Firebase API Key" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firebase_api_key" placeholder="AIzaSy..."/>
                             </setting>
-                            <setting string="Seerbit Firestore Project ID" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
+                            <setting string="Seerbit Firestore Project ID" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firestore_project_id" placeholder="your-project-id"/>
                             </setting>
-                            <setting string="Seerbit Firestore Service Account JSON" attrs="{'invisible': [('module_pos_seerbit', '=', False)]}">
+                            <setting string="Seerbit Firestore Service Account JSON" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firestore_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
                                 <div class="text-muted mt8">
                                     Paste the entire content of your Firestore service account JSON file here.
