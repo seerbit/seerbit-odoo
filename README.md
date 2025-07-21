@@ -10,62 +10,67 @@
 An Odoo Integration for Seerbit POS Terminal 
 </h2>
 
-## Version: 0.1.3
+## Version: 0.1.5
 
-> **Note:** As of v0.1.3, this module uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
+> **Note:** As of v0.1.5, this module is compatible with Odoo 16.0, 17.0, and 18.1 (latest as of July 21, 2025). It uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
 
 ## How to Use
 
 A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_seerbit/)
 
+## Compatibility
+
+- **Odoo 16.0**
+- **Odoo 17.0**
+- **Odoo 18.1** 
+
+## Features
+
+- ✅ Compatible with Odoo 16.0, 17.0, and 18.1
+- ✅ Enhanced UI and payment flow for Odoo 18.1
+- ✅ Firebase-based payment reconciliation
+- ✅ Environment variable configuration
+- ✅ Complete payment record creation
+- ✅ Comprehensive error handling
+- ✅ Test suite (16 tests)
+- ✅ Odoo.sh compatible
+
 ## Version History
+
+## **[0.1.5]** 21/07/2025
+### Impacted Versions:
+- Odoo 16.0, 17.0, 18.1
+### Changes:
+- Odoo 18.1 UI and payment flow enhancements
+- Documentation and manifest updated for Odoo 18.1 compatibility
 
 ## **[0.1.3]** 07/07/2025
 ### Impacted Versions:
-
 - Odoo16 - 18/04/2023
 - Odoo15 - 18/04/2023
-
 ### Changes:
-
 - Firebase replaces webhooks now for payment reconciliation
 
-## Version History
-
 ## **[0.1.2]** 18/04/2023
-
 ### Impacted Versions:
-
 - Odoo16 - 18/04/2023
 - Odoo15 - 18/04/2023
-
 ### Changes:
-
 - Elimination of the need of Seerbit account `SECRET KEY`
 - Code refactoring
 
-## Version History
-
 ## **[0.1.1]** 17/04/2023
-
 ### Impacted Versions:
-
 - Odoo16 - 17/04/2023
 - Odoo15 - 17/04/2023
-
 ### Changes:
-
 - Moved payment matching logic to python layer
 - Ensures that latest response gets deleted after consumption
 
 ## **[0.0.1]** 30/03/2023
-
 ### Impacted Versions:
-
 - Odoo16 - 30/03/2023
-
 ### Changes:
-
 - creates the Seerbit bank journal at installation.
 - creates a manual Seerbit payment method at installation.
 - listens for Seerbit's notification at `your_odoo_url/pos_seerbit/notification`.
@@ -144,18 +149,3 @@ For issues and questions:
 - Check the logs in Odoo.sh
 - Review Firebase configuration
 - Verify Seerbit integration settings
-
-## Features
-
-- ✅ Firebase-based payment reconciliation
-- ✅ Environment variable configuration
-- ✅ Complete payment record creation
-- ✅ Comprehensive error handling
-- ✅ Test suite (16 tests)
-- ✅ Odoo.sh compatible
-
-## Version History
-
-- **v0.1.3**: Firebase integration with environment config
-- **v0.1.2**: Initial Seerbit integration
-- **v0.1.1**: Basic POS payment terminal

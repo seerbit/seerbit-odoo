@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Seerbit Odoo Point of Sale",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "category": "Sales/Point of Sale",
     "summary": "Integrate your POS with a Seerbit payment terminal with real-time payment and reconciliation.",
     "description": """
@@ -13,6 +13,9 @@
         - Firestore integration for payment reconciliation
         - Automatic payment status updates
         - Configurable through Odoo settings
+        
+        # Compatibility:
+        - Odoo 16.0, 17.0, 18.1
     """,
     "author": "Seerbit",
     "website": "https://github.com/seerbit/seerbit-odoo",
@@ -29,7 +32,6 @@
     ],
     "installable": True,
     "application": False,
-    "auto_install": False,
     "post_init_hook": "post_init_hook",
     "assets": {
         # Firestore SDK - Local files for better reliability
