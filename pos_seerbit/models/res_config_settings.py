@@ -52,6 +52,7 @@ class ResConfigSettings(models.TransientModel):
         string="Firestore Project ID",
         help="The Project ID of your Firestore project.",
         groups="base.group_erp_manager",
+        default="pospushnotif",
     )
     seerbit_firebase_api_key = fields.Char(
         string="Firebase API Key",

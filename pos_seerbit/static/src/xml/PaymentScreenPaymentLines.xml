@@ -2,7 +2,7 @@
 <templates id="template" xml:space="preserve">
     <t t-name="SeerbitPaymentScreenPaymentLines" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension" owl="1">
         <xpath expr="//div[hasclass('electronic_payment')]" position="inside">
-            <t t-elif="line.payment_status == 'waitingSeerbit'">
+            <t t-if="line.payment_status == 'waitingSeerbit'">
                 <div class="electronic_status waiting" aria-live="polite">
                     <span class="seerbit-icon" aria-hidden="true">
                         <i class="fa fa-hourglass-half"/> <!-- FontAwesome waiting icon -->
@@ -16,7 +16,7 @@
                     <i class="fa fa-redo seerbit-icon" aria-hidden="true"/> Retry
                 </div>
             </t>
-            <t t-elif="line.payment_status == 'errorSeerbit'">
+            <t t-else="line.payment_status == 'errorSeerbit'">
                 <div class="electronic_status error" aria-live="polite">
                     <span class="seerbit-icon" aria-hidden="true">
                         <i class="fa fa-exclamation-triangle"/> <!-- FontAwesome error icon -->
