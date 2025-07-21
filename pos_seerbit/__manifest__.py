@@ -15,7 +15,7 @@
         - Configurable through Odoo settings
         
         # Compatibility:
-        - Odoo 16.0, 17.0, 18.1
+        - Odoo 16.0, 17.0, 18.0
     """,
     "author": "Seerbit",
     "website": "https://github.com/seerbit/seerbit-odoo",
