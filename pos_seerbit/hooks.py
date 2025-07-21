@@ -1,12 +1,11 @@
-from odoo import api, SUPERUSER_ID
+from odoo import api
 
 
-def post_init_hook(cr, registry):
+def post_init_hook(env):
     """
     Ensure the Seerbit journal exists after module installation.
     Use the main company currency if available, otherwise use USD.
     """
-    env = api.Environment(cr, SUPERUSER_ID, {})
     company = env['res.company'].search([], limit=1)
     currency = company.currency_id
     if not currency:
