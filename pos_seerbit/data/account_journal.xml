@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<!-- <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <record id="seerbit" model="account.journal">
         <field name="name">Seerbit</field>
@@ -8,4 +8,4 @@
         <field name="show_on_dashboard" eval="True"/>
         <field name="active" eval="True"/>
     </record>
-</odoo>
+</odoo> -->
