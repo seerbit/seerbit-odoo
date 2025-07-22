@@ -2,9 +2,6 @@
 <templates id="template" xml:space="preserve">
     <t t-name="SeerbitPaymentScreenPaymentLines" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension" owl="1">
         <xpath expr="//div[hasclass('electronic_payment')]" position="inside">
-            <div style="background:#ffeedd;color:#a13e00;padding:8px;margin-bottom:8px;border-radius:6px;font-weight:bold;">
-                [Seerbit] PaymentScreenPaymentLines extension loaded
-            </div>
             <t t-if="line.payment_status == 'waitingSeerbit'">
                 <div class="electronic_status waiting" aria-live="polite">
                     <span class="seerbit-icon" aria-hidden="true">

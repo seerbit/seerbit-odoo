@@ -1,7 +1,6 @@
 odoo.define('pos_seerbit.PaymentScreen', function(require) {
     "use strict";
 
-    const { patch } = require('web.utils');
     const PaymentScreen = require('point_of_sale.PaymentScreen');
     const Registries = require('point_of_sale.Registries');
     const { onMounted } = owl;
@@ -27,39 +26,9 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                     });
                 }
             });
-            this.env.bus.on('send-payment-request', this, this._onSendPaymentRequest);
-        }
-
-        async sendPaymentRequestSeerbit(line) {
-            if (line.payment_method.use_payment_terminal === 'seerbit') {
-                if (line.payment_terminal && line.payment_terminal.send_payment_request) {
-                    await line.payment_terminal.send_payment_request(line.cid);
-                }
-            }
-        }
-
-        async _onSendPaymentRequest(ev) {
-            const line = ev.detail;
-            await this.sendPaymentRequestSeerbit(line);
         }
     }
 
     Registries.Component.extend(PaymentScreen, PosSeerbitPaymentScreen);
     return PaymentScreen;
-});
-
-odoo.define('pos_seerbit.PaymentScreenPaymentLines', function(require) {
-    "use strict";
-    const { patch } = require('web.utils');
-    const PaymentScreenPaymentLines = require('point_of_sale.PaymentScreenPaymentLines');
-
-    patch(PaymentScreenPaymentLines.prototype, {
-        setup() {
-            super.setup();
-            console.log('[Seerbit] PaymentScreenPaymentLines loaded');
-        },
-        getSeerbitTest() {
-            return true;
-        },
-    });
 });
