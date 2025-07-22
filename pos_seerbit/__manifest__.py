@@ -48,6 +48,7 @@
             "pos_seerbit/static/src/js/firebase_listener.js",
             "pos_seerbit/static/src/scss/pos.scss",
             "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
+            "pos_seerbit/static/src/js/test.js",
         ],
     },
     "license": "OPL-1",
