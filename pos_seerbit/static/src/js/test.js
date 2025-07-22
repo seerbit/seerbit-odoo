@@ -1,3 +1,3 @@
-odoo.define('pos_seerbit.test', function () {
-    console.log('Seerbit test JS loaded!');
-}); 
+/** @odoo-module **/
+
+console.log('Seerbit test JS loaded!'); 
