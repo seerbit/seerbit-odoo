@@ -25,38 +25,22 @@ $seerbit-transition: all 0.15s cubic-bezier(0.4,0,0.2,1);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    min-width: 140px;
-    
-    &:hover {
+    gap: 0.5em;
+    outline: none;
+
+    &:hover, &:focus {
         background: $seerbit-danger-dark;
         border-color: $seerbit-danger-dark;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 16px rgba(204,85,0,0.15);
     }
-    
     &:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    &:focus {
-        outline: 2px solid rgba(204, 85, 0, 0.3);
-        outline-offset: 2px;
-    }
-    
-    &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
+        background: darken($seerbit-danger, 10%);
     }
 }
 
-.button.highlight {
-    text-align: center;
-    padding: 1rem 2rem;
-    background: #007bff;
-    border: solid 1px #007bff;
+.button.send_payment_request {
+    background: $seerbit-success;
+    border: solid 1px $seerbit-success;
     color: #fff;
     border-radius: $seerbit-border-radius;
     box-shadow: $seerbit-shadow;
@@ -68,261 +52,55 @@ $seerbit-transition: all 0.15s cubic-bezier(0.4,0,0.2,1);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    min-width: 140px;
-    
-    &:hover {
-        background: #0056b3;
-        border-color: #0056b3;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    gap: 0.5em;
+    outline: none;
+    margin-left: 0.5em;
+
+    &:hover, &:focus {
+        background: darken($seerbit-success, 10%);
+        border-color: darken($seerbit-success, 10%);
+        box-shadow: 0 4px 16px rgba(39,174,96,0.12);
     }
-    
     &:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    &:focus {
-        outline: 2px solid rgba(0, 123, 255, 0.3);
-        outline-offset: 2px;
-    }
-    
-    &:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
+        background: darken($seerbit-success, 15%);
     }
 }
 
 .electronic_status {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: $seerbit-border-radius;
+    gap: 0.5em;
+    font-size: 1.05rem;
     font-weight: 500;
-    margin-bottom: 0.5rem;
-    
-    &.waiting {
-        background: rgba(243, 156, 18, 0.1);
-        color: $seerbit-waiting;
-        border: 1px solid rgba(243, 156, 18, 0.2);
-    }
-    
-    &.error {
-        background: rgba(231, 76, 60, 0.1);
-        color: $seerbit-error;
-        border: 1px solid rgba(231, 76, 60, 0.2);
-    }
-    
-    .seerbit-icon {
-        font-size: 1.2rem;
-    }
-}
-
-// Terminal Interface Styles
-.seerbit-terminal-interface {
-    padding: 1.5rem;
-    background: #fff;
+    margin-bottom: 0.5em;
+    padding: 0.5em 0.75em;
     border-radius: $seerbit-border-radius;
     box-shadow: $seerbit-shadow;
-    max-width: 500px;
-    margin: 0 auto;
-    
-    .terminal-header {
-        text-align: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #e9ecef;
-        
-        h3 {
-            margin: 0 0 0.5rem 0;
-            color: #2c3e50;
-            font-weight: 600;
-        }
-        
-        .payment-amount {
-            font-size: 1.2rem;
-            font-weight: 500;
-            color: #495057;
-            
-            span {
-                color: #28a745;
-                font-weight: 600;
-            }
-        }
+    &.waiting {
+        background: $seerbit-waiting;
+        color: #fff;
     }
-    
-    .terminal-status {
-        margin-bottom: 1.5rem;
-        
-        .status-message {
-            padding: 0.75rem 1rem;
-            border-radius: $seerbit-border-radius;
-            font-weight: 500;
-            text-align: center;
-            
-            &.status-ready {
-                background: rgba(40, 167, 69, 0.1);
-                color: #28a745;
-                border: 1px solid rgba(40, 167, 69, 0.2);
-            }
-            
-            &.status-processing {
-                background: rgba(255, 193, 7, 0.1);
-                color: #ffc107;
-                border: 1px solid rgba(255, 193, 7, 0.2);
-            }
-            
-            &.status-success {
-                background: rgba(40, 167, 69, 0.1);
-                color: #28a745;
-                border: 1px solid rgba(40, 167, 69, 0.2);
-            }
-            
-            &.status-error {
-                background: rgba(220, 53, 69, 0.1);
-                color: #dc3545;
-                border: 1px solid rgba(220, 53, 69, 0.2);
-            }
-        }
-    }
-    
-    .terminal-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-        
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: $seerbit-border-radius;
-            font-weight: 600;
-            font-size: 1rem;
-            border: none;
-            cursor: pointer;
-            transition: $seerbit-transition;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            
-            &:hover {
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-            
-            &:active {
-                transform: translateY(0);
-            }
-            
-            &:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-                transform: none;
-            }
-            
-            &.btn-primary {
-                background: #007bff;
-                color: #fff;
-                
-                &:hover {
-                    background: #0056b3;
-                }
-            }
-            
-            &.btn-warning {
-                background: $seerbit-danger;
-                color: #fff;
-                
-                &:hover {
-                    background: $seerbit-danger-dark;
-                }
-            }
-            
-            &.btn-secondary {
-                background: #6c757d;
-                color: #fff;
-                
-                &:hover {
-                    background: #545b62;
-                }
-            }
-        }
-        
-        .processing-state,
-        .success-state {
-            padding: 0.75rem 1rem;
-            border-radius: $seerbit-border-radius;
-            text-align: center;
-            font-weight: 500;
-            
-            i {
-                margin-right: 0.5rem;
-            }
-        }
-        
-        .processing-state {
-            background: rgba(255, 193, 7, 0.1);
-            color: #ffc107;
-            border: 1px solid rgba(255, 193, 7, 0.2);
-        }
-        
-        .success-state {
-            background: rgba(40, 167, 69, 0.1);
-            color: #28a745;
-            border: 1px solid rgba(40, 167, 69, 0.2);
-        }
-    }
-    
-    .terminal-instructions {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: $seerbit-border-radius;
-        border-left: 4px solid #007bff;
-        
-        p {
-            margin: 0 0 0.5rem 0;
-            font-weight: 600;
-            color: #495057;
-        }
-        
-        ol {
-            margin: 0;
-            padding-left: 1.5rem;
-            color: #6c757d;
-            
-            li {
-                margin-bottom: 0.25rem;
-                
-                &:last-child {
-                    margin-bottom: 0;
-                }
-            }
-        }
+    &.error {
+        background: $seerbit-error;
+        color: #fff;
     }
 }
 
-// Responsive design
-@media (max-width: 768px) {
-    .seerbit-terminal-interface {
-        padding: 1rem;
-        margin: 0.5rem;
-        
-        .terminal-actions {
-            .btn {
-                padding: 0.875rem 1rem;
-                font-size: 0.95rem;
-            }
-        }
-    }
-    
-    .button.dangerous,
-    .button.highlight {
-        padding: 0.875rem 1.5rem;
+// Icon support (FontAwesome or SVG)
+.button .fa, .button .seerbit-icon {
+    font-size: 1.2em;
+    margin-right: 0.4em;
+    vertical-align: middle;
+}
+
+// Responsive tweaks
+@media (max-width: 600px) {
+    .button.dangerous, .button.send_payment_request {
         font-size: 1rem;
-        min-width: 120px;
+        padding: 0.7rem 1.2rem;
+    }
+    .electronic_status {
+        font-size: 0.98rem;
+        padding: 0.4em 0.5em;
     }
 }
