@@ -54,7 +54,7 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
-tests/
+tests
 
 # Linting and formatting
 .mypy_cache/
