@@ -2,8 +2,8 @@
 
 import { _t } from "@web/core/l10n/translation";
 import { rpc } from "@web/core/network/rpc";
-import PaymentInterface from "@point_of_sale/app/store/payment_interface";
-import { Gui } from "@point_of_sale/app/gui/gui";
+import PaymentInterface from "point_of_sale.PaymentInterface";
+import { Gui } from "point_of_sale.Gui";
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
