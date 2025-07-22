@@ -50,7 +50,6 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
 odoo.define('pos_seerbit.PaymentScreenPaymentLines', function(require) {
     "use strict";
-
     const { patch } = require('web.utils');
     const PaymentScreenPaymentLines = require('point_of_sale.PaymentScreenPaymentLines');
 
@@ -59,14 +58,8 @@ odoo.define('pos_seerbit.PaymentScreenPaymentLines', function(require) {
             super.setup();
             console.log('[Seerbit] PaymentScreenPaymentLines loaded');
         },
-        async _onSendPaymentRequest(ev) {
-            const line = ev.detail;
-            console.log('[Seerbit] Send Payment Request triggered for line:', line);
-            if (line.payment_method.use_payment_terminal === 'seerbit') {
-                if (line.payment_terminal && line.payment_terminal.send_payment_request) {
-                    await line.payment_terminal.send_payment_request(line.cid);
-                }
-            }
+        getSeerbitTest() {
+            return true;
         },
     });
 });
