@@ -1,13 +1,11 @@
 /** @odoo-module **/
 
-import core from 'web.core';
-import rpc from 'web.rpc';
-import PaymentInterface from 'point_of_sale.PaymentInterface';
-import { Gui } from 'point_of_sale.Gui';
+import { _t } from "@web/core/l10n/translation";
+import { rpc } from "@web/core/network/rpc";
+import PaymentInterface from "@point_of_sale/app/store/payment_interface";
+import { Gui } from "@point_of_sale/app/gui/gui";
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
-
-const _t = core._t;
 
 class PaymentSeerbit extends PaymentInterface {
     init() {

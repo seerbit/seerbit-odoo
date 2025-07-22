@@ -39,8 +39,8 @@
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
         ],
-        "point_of_sale.assets": [
-            # Explicitly listed Seerbit assets for debugging
+        'point_of_sale._assets_pos': [
+            # Seerbit POS assets
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/PaymentScreen.js",
@@ -48,7 +48,6 @@
             "pos_seerbit/static/src/js/firebase_listener.js",
             "pos_seerbit/static/src/scss/pos.scss",
             "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
-            "pos_seerbit/static/src/js/test.js",
         ],
     },
     "license": "OPL-1",
