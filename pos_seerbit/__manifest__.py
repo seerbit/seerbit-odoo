@@ -21,7 +21,7 @@
     "website": "https://github.com/seerbit/seerbit-odoo",
     "data": [
         "security/ir.model.access.csv",
-        # "data/account_journal.xml",
+        "data/account_journal.xml",
         "data/pos.payment.method.csv",
         "views/res_config_settings_views.xml",
         "views/pos_payment_method_views.xml",

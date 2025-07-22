@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
-    
+    <!-- Journal creation moved to post_init_hook for Odoo 17/18 compatibility -->
     <record id="seerbit" model="account.journal">
         <field name="name">Seerbit</field>
         <field name="type">bank</field>
@@ -9,5 +9,4 @@
         <field name="show_on_dashboard" eval="True"/>
         <field name="active" eval="True"/>
     </record>
-   
 </odoo> 
