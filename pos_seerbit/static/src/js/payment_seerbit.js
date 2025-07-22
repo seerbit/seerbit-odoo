@@ -22,6 +22,7 @@ odoo.define('pos_seerbit.payment', function (require) {
             this.was_cancelled = false;
             this.supports_reversals = false;
             this._initializeFirebase();
+            console.log('[Seerbit] PaymentSeerbit loaded');
         }
 
         _initializeFirebase() {
@@ -39,6 +40,7 @@ odoo.define('pos_seerbit.payment', function (require) {
         send_payment_request(cid) {
             super.send_payment_request(cid);
             this._reset_state();
+            console.log('[Seerbit] send_payment_request called for cid:', cid);
             return this._seerbit_pay(cid);
         }
         send_payment_cancel(order, cid) {
@@ -98,6 +100,7 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _seerbit_pay(cid) {
             var order = this.pos.get_order();
+            console.log('[Seerbit] _seerbit_pay called for cid:', cid);
             if (order.selected_paymentline.amount < 0.01) {
                 this._show_error(_t('Cannot process transactions with invalid amount.'), 'Amount Error');
                 return Promise.resolve();
@@ -113,6 +116,7 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _send_payment_request_to_firestore(cid) {
             const order = this.pos.get_order();
+            console.log('[Seerbit] _send_payment_request_to_firestore called for cid:', cid);
             if (!order) {
                 console.error('No order available for payment');
                 return Promise.reject(new Error('No order available'));
