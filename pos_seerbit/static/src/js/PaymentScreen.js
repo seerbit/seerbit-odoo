@@ -1,10 +1,10 @@
 /** @odoo-module **/
 
 import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
-import { Registries } from '@point_of_sale/app/store/registries';
-import { onMounted } from 'owl';
+import { patch } from '@web/core/utils/patch';
+import { onMounted } from '@odoo/owl';
 
-const PosSeerbitPaymentScreen = (PaymentScreen) => class extends PaymentScreen {
+patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
         onMounted(() => {
@@ -17,9 +17,5 @@ const PosSeerbitPaymentScreen = (PaymentScreen) => class extends PaymentScreen {
                 pendingPaymentLine.set_payment_status('waitingSeerbit');
             }
         });
-    }
-};
-
-Registries.Component.extend(PaymentScreen, PosSeerbitPaymentScreen);
-
-export default PosSeerbitPaymentScreen;
+    },
+});

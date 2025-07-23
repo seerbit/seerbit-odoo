@@ -1,9 +1,9 @@
 /** @odoo-module **/
 
 import { _t } from '@web/core/l10n/translation';
-import { rpc } from '@web/core/network/rpc';
-import { Gui } from '@point_of_sale/app/gui/gui';
+import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_popup';
 import FirebaseInit from './firebase_init';
+
 
 function listenForReconciliation(transactionId) {
     if (!FirebaseInit.isFirebaseAvailable()) {
@@ -23,14 +23,14 @@ function listenForReconciliation(transactionId) {
         return;
     }
     const reconciliationsRef = firestoreDb.collection('reconciliations');
-    const unsubscribe = reconciliationsRef.onSnapshot(function(snapshot) {
-        snapshot.docChanges().forEach(function(change) {
+    const unsubscribe = reconciliationsRef.onSnapshot(async function(snapshot) {
+        snapshot.docChanges().forEach(async function(change) {
             if (change.type === 'added') {
                 const data = change.doc.data();
                 const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
                 if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) ) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
-                    Gui.showPopup('ConfirmPopup', {
+                    await window.__owl__.root.env.services.popup.add(ConfirmPopup, {
                         title: _t('Payment Successful'),
                         body: _t('Payment has been successfully processed.'),
                     });
