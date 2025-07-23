@@ -33,13 +33,20 @@
     "application": False,
     "post_init_hook": "post_init_hook",
     "assets": {
-        # Firestore SDK - Local files for better reliability
+        # All assets loaded in backend to ensure availability
         "web.assets_backend": [
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
+            "pos_seerbit/static/src/js/models.js",
+            "pos_seerbit/static/src/js/firebase_init.js",
+            "pos_seerbit/static/src/js/PaymentScreen.js",
+            "pos_seerbit/static/src/js/payment_seerbit.js",
+            "pos_seerbit/static/src/js/firebase_listener.js",
+            "pos_seerbit/static/src/scss/pos.scss",
+            "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
         ],
+        # Also load in POS bundle for POS-specific functionality
         "point_of_sale.assets": [
-            # Seerbit POS assets
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/PaymentScreen.js",
