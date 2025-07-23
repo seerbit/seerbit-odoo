@@ -1,10 +1,10 @@
-odoo.define('pos_seerbit.firebase_listener', ['@web/core/l10n/translation', '@web/core/network/rpc', 'point_of_sale.Gui', './firebase_init'], function (require) {
+odoo.define('pos_seerbit.firebase_listener', ['@web/core/l10n/translation', '@web/core/network/rpc', 'point_of_sale.Gui', 'pos_seerbit.firebase_init'], function (require) {
     'use strict';
 
     const { _t } = require("@web/core/l10n/translation");
     const { rpc } = require("@web/core/network/rpc");
     const { Gui } = require("point_of_sale.Gui");
-    const FirebaseInit = require('./firebase_init');
+    const FirebaseInit = require('pos_seerbit.firebase_init');
 
     function listenForReconciliation(transactionId) {
         if (!FirebaseInit.isFirebaseAvailable()) {

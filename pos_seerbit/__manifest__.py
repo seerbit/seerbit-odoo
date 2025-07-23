@@ -38,7 +38,7 @@
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
         ],
-        'point_of_sale._assets_pos': [
+        "point_of_sale.assets": [
             # Seerbit POS assets
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",

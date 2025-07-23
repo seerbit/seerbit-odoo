@@ -1,12 +1,12 @@
-odoo.define('pos_seerbit.payment_seerbit', ['@web/core/l10n/translation', '@web/core/network/rpc', 'point_of_sale.PaymentInterface', 'point_of_sale.Gui', './firebase_init', './firebase_listener'], function (require) {
+odoo.define('pos_seerbit.payment_seerbit', ['@web/core/l10n/translation', '@web/core/network/rpc', 'point_of_sale.PaymentInterface', 'point_of_sale.Gui', 'pos_seerbit.firebase_init', 'pos_seerbit.firebase_listener'], function (require) {
     'use strict';
 
     const { _t } = require("@web/core/l10n/translation");
     const { rpc } = require("@web/core/network/rpc");
     const PaymentInterface = require("point_of_sale.PaymentInterface");
     const { Gui } = require("point_of_sale.Gui");
-    const FirebaseInit = require('./firebase_init');
-    const FirebaseListener = require('./firebase_listener');
+    const FirebaseInit = require('pos_seerbit.firebase_init');
+    const FirebaseListener = require('pos_seerbit.firebase_listener');
 
     class PaymentSeerbit extends PaymentInterface {
         init() {
