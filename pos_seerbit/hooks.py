@@ -56,6 +56,7 @@ def post_init_hook(env):
 
         # Safely handle the Seerbit payment method
         payment_method = env['pos.payment.method'].search([('name', '=', 'Seerbit POS')], limit=1)
+        
         if not payment_method:
             # Create new payment method
             receivable_account = journal.default_account_id
@@ -79,28 +80,64 @@ def post_init_hook(env):
             else:
                 _logger.warning("No suitable receivable account found, payment method not created")
         else:
-            # Update existing payment method if needed
-            update_values = {}
-            if payment_method.journal_id != journal:
-                update_values['journal_id'] = journal.id
-            if payment_method.use_payment_terminal != 'seerbit':
-                update_values['use_payment_terminal'] = 'seerbit'
+            # Check if this payment method has associated payments
+            has_payments = env['pos.payment'].search_count([('payment_method_id', '=', payment_method.id)]) > 0
             
-            # Check if receivable account needs updating
-            if not payment_method.receivable_account_id:
-                receivable_account = journal.default_account_id
-                if not receivable_account:
-                    receivable_account = env['account.account'].search([
-                        ('account_type', '=', 'asset_receivable'),
-                        ('company_id', '=', company.id),
-                        ('deprecated', '=', False)
-                    ], limit=1)
-                if receivable_account:
-                    update_values['receivable_account_id'] = receivable_account.id
-            
-            if update_values:
-                payment_method.write(update_values)
-                _logger.info("Updated Seerbit payment method with values: %s", update_values)
+            if has_payments:
+                _logger.info("Payment method has associated payments, updating in place instead of recreating")
+                # Update existing payment method if needed
+                update_values = {}
+                if payment_method.journal_id != journal:
+                    update_values['journal_id'] = journal.id
+                if payment_method.use_payment_terminal != 'seerbit':
+                    update_values['use_payment_terminal'] = 'seerbit'
+                
+                # Check if receivable account needs updating
+                if not payment_method.receivable_account_id:
+                    receivable_account = journal.default_account_id
+                    if not receivable_account:
+                        receivable_account = env['account.account'].search([
+                            ('account_type', '=', 'asset_receivable'),
+                            ('company_id', '=', company.id),
+                            ('deprecated', '=', False)
+                        ], limit=1)
+                    if receivable_account:
+                        update_values['receivable_account_id'] = receivable_account.id
+                
+                if update_values:
+                    payment_method.write(update_values)
+                    _logger.info("Updated existing Seerbit payment method with values: %s", update_values)
+            else:
+                # No associated payments, we can safely recreate
+                _logger.info("No associated payments found, recreating payment method")
+                try:
+                    # Archive the old payment method
+                    payment_method.write({'active': False})
+                    
+                    # Create new payment method
+                    receivable_account = journal.default_account_id
+                    if not receivable_account:
+                        receivable_account = env['account.account'].search([
+                            ('account_type', '=', 'asset_receivable'),
+                            ('company_id', '=', company.id),
+                            ('deprecated', '=', False)
+                        ], limit=1)
+                    
+                    if receivable_account:
+                        payment_method = env['pos.payment.method'].create({
+                            'name': 'Seerbit POS',
+                            'journal_id': journal.id,
+                            'use_payment_terminal': 'seerbit',
+                            'receivable_account_id': receivable_account.id,
+                            'is_cash_count': False,
+                        })
+                        _logger.info("Recreated Seerbit payment method with ID: %s", payment_method.id)
+                    else:
+                        _logger.warning("No suitable receivable account found, payment method not recreated")
+                except Exception as e:
+                    _logger.error("Failed to recreate payment method: %s", str(e))
+                    # Reactivate the old one if recreation failed
+                    payment_method.write({'active': True})
         
         # Set image for Seerbit payment method if it exists
         if payment_method:
