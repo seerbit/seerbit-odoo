@@ -1,4 +1,4 @@
-odoo.define('pos_seerbit.PaymentScreen', function (require) {
+odoo.define('pos_seerbit.PaymentScreen', ['point_of_sale.PaymentScreen', 'point_of_sale.Registries', 'owl'], function (require) {
     'use strict';
 
     const { PaymentScreen } = require("point_of_sale.PaymentScreen");

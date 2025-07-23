@@ -1,4 +1,4 @@
-odoo.define('pos_seerbit.firebase_init', function (require) {
+odoo.define('pos_seerbit.firebase_init', ['@web/core/l10n/translation', '@web/core/network/rpc'], function (require) {
     'use strict';
 
     const { _t } = require("@web/core/l10n/translation");

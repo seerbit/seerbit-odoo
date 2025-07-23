@@ -1,4 +1,4 @@
-odoo.define('pos_seerbit.payment_seerbit', function (require) {
+odoo.define('pos_seerbit.payment_seerbit', ['@web/core/l10n/translation', '@web/core/network/rpc', 'point_of_sale.PaymentInterface', 'point_of_sale.Gui', './firebase_init', './firebase_listener'], function (require) {
     'use strict';
 
     const { _t } = require("@web/core/l10n/translation");
