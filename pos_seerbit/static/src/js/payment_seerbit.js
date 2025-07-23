@@ -6,8 +6,9 @@ import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_pop
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
-function initializeSeerbitFirebase(env) {
-    FirebaseInit.initializeFirebase(env).then(function(success) {
+// Accepts an rpc argument (this.pos.rpc)
+function initializeSeerbitFirebase(rpc) {
+    FirebaseInit.initializeFirebase(rpc).then(function(success) {
         if (!success) {
             console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
         }
@@ -22,7 +23,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false; // Seerbit doesn't support reversals
-        initializeSeerbitFirebase(this.env);
+        initializeSeerbitFirebase(this.pos.rpc);
     }
 
     async send_payment_request(cid) {
@@ -77,7 +78,7 @@ export default class SeerbitPayment extends PaymentInterface {
             console.error('Error creating payment payload:', error);
             return Promise.reject(error);
         }
-        return this.env.services.rpc.query({
+        return this.pos.rpc({
             model: 'pos.payment.method',
             method: 'send_seerbit_payment_request',
             args: [[paymentLine.payment_method?.id], payload],
@@ -149,7 +150,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false;
-        initializeSeerbitFirebase(this.env);
+        initializeSeerbitFirebase(this.pos.rpc);
     }
 
     async send_payment_cancel(order, cid) {

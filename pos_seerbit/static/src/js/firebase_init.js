@@ -7,18 +7,23 @@ let firebaseInitialized = false;
 let firestoreDb = null;
 let initializationPromise = null;
 
-function initializeFirebase(env) {
+// Accepts an rpc argument (this.pos.rpc or useService('rpc'))
+function initializeFirebase(rpc) {
     if (initializationPromise) {
         return initializationPromise;
     }
     if (firebaseInitialized && firestoreDb) {
         return Promise.resolve(true);
     }
-    if (!env || !env.services || !env.services.rpc) {
-        console.error('env.services.rpc is required for initializeFirebase');
+    if (!rpc) {
+        console.error('rpc is required for initializeFirebase');
         return Promise.resolve(false);
     }
-    initializationPromise = env.services.rpc.query({
+    // rpc can be either a function (this.pos.rpc) or an object with .query (useService('rpc'))
+    const rpcCall = typeof rpc === 'function' ?
+        (params) => rpc(params) :
+        (params) => rpc.query(params);
+    initializationPromise = rpcCall({
         model: 'pos.payment.method',
         method: 'get_firestore_config',
         args: [],
@@ -80,11 +85,11 @@ function getFirebaseStatus() {
     };
 }
 
-function reinitializeFirebase(env) {
+function reinitializeFirebase(rpc) {
     firebaseInitialized = false;
     firestoreDb = null;
     initializationPromise = null;
-    return initializeFirebase(env);
+    return initializeFirebase(rpc);
 }
 
 export default {
