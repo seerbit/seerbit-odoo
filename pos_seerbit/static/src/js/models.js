@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
-import { paymentMethods } from 'point_of_sale.models';
 import PaymentSeerbit from './payment_seerbit';
+import { registry } from '@web/core/registry';
 
-paymentMethods.add('seerbit', PaymentSeerbit);
+// Register your payment method under the POS payments registry
+registry.category('pos_payment_method_interface').add('seerbit', PaymentSeerbit);
