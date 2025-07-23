@@ -15,7 +15,7 @@
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
                 <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="send_payment_request(line)">
-                    <i class="fa fa-redo seerbit-icon" aria-hidden="true"/> Retry
+                    <i class="fa fa-repeat seerbit-icon" aria-hidden="true"/> Retry
                 </div>
                                 </div>
 
