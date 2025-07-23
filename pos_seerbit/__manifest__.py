@@ -37,6 +37,9 @@
         "web.assets_backend": [
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
+        ],
+        # Also load in POS bundle for POS-specific functionality
+        "point_of_sale.assets": [
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/PaymentScreen.js",
@@ -45,8 +48,7 @@
             "pos_seerbit/static/src/scss/pos.scss",
             "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
         ],
-        # Also load in POS bundle for POS-specific functionality
-        "point_of_sale.assets": [
+        "point_of_sale.assets_prod": [
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/PaymentScreen.js",
