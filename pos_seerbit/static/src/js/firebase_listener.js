@@ -2,7 +2,7 @@
 
 import { _t } from '@web/core/l10n/translation';
 import { rpc } from '@web/core/network/rpc';
-import { Gui } from 'point_of_sale.Gui';
+import { Gui } from '@point_of_sale/app/gui/gui';
 import FirebaseInit from './firebase_init';
 
 function listenForReconciliation(transactionId) {

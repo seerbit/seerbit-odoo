@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
-import { PaymentScreen } from 'point_of_sale.PaymentScreen';
-import { Registries } from 'point_of_sale.Registries';
+import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
+import { Registries } from '@point_of_sale/app/store/registries';
 import { onMounted } from 'owl';
 
 const PosSeerbitPaymentScreen = (PaymentScreen) => class extends PaymentScreen {
