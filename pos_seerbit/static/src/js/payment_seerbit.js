@@ -7,8 +7,8 @@ import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_pop
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
-function initializeSeerbitFirebase() {
-    FirebaseInit.initializeFirebase().then(function(success) {
+function initializeSeerbitFirebase(env) {
+    FirebaseInit.initializeFirebase(env).then(function(success) {
         if (!success) {
             console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
         }
@@ -20,7 +20,7 @@ function initializeSeerbitFirebase() {
 patch(PaymentScreen, {
     setup(superSetup) {
         superSetup();
-        initializeSeerbitFirebase();
+        initializeSeerbitFirebase(this.env);
     },
     async send_payment_request(superMethod, paymentLine) {
         if (paymentLine.payment_method.use_payment_terminal === 'seerbit') {
@@ -40,7 +40,7 @@ patch(PaymentScreen, {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.seerbit_supports_reversals = false; // Seerbit doesn't support reversals
-        initializeSeerbitFirebase();
+        initializeSeerbitFirebase(this.env);
     },
     async _seerbit_pay(paymentLine) {
         const order = this.currentOrder;

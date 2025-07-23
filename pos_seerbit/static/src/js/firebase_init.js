@@ -1,21 +1,24 @@
 /** @odoo-module **/
 
 import { _t } from '@web/core/l10n/translation';
-import { rpc } from '@web/core/network/rpc';
 
 // Global variables to track Firebase state
 let firebaseInitialized = false;
 let firestoreDb = null;
 let initializationPromise = null;
 
-function initializeFirebase() {
+function initializeFirebase(env) {
     if (initializationPromise) {
         return initializationPromise;
     }
     if (firebaseInitialized && firestoreDb) {
         return Promise.resolve(true);
     }
-    initializationPromise = rpc.query({
+    if (!env || !env.services || !env.services.rpc) {
+        console.error('env.services.rpc is required for initializeFirebase');
+        return Promise.resolve(false);
+    }
+    initializationPromise = env.services.rpc.query({
         model: 'pos.payment.method',
         method: 'get_firestore_config',
         args: [],
@@ -77,11 +80,11 @@ function getFirebaseStatus() {
     };
 }
 
-function reinitializeFirebase() {
+function reinitializeFirebase(env) {
     firebaseInitialized = false;
     firestoreDb = null;
     initializationPromise = null;
-    return initializeFirebase();
+    return initializeFirebase(env);
 }
 
 export default {

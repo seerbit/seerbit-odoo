@@ -3,4 +3,4 @@
 import { register_payment_method } from '@point_of_sale/app/store/models';
 import PaymentSeerbit from './payment_seerbit';
 
-register_payment_method('seerbit', PaymentSeerbit);
+    register_payment_method('seerbit', PaymentSeerbit);
