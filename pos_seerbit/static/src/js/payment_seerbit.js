@@ -1,7 +1,6 @@
 /** @odoo-module **/
 
-import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
-import { patch } from '@web/core/utils/patch';
+import { PaymentInterface } from '@point_of_sale/app/payment/payment_interface';
 import { _t } from '@web/core/l10n/translation';
 import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_popup';
 import FirebaseInit from './firebase_init';
@@ -17,45 +16,31 @@ function initializeSeerbitFirebase(env) {
     });
 }
 
-patch(PaymentScreen, {
-    setup(superSetup) {
-        superSetup();
-        initializeSeerbitFirebase(this.env);
-    },
-    async send_payment_request(superMethod, paymentLine) {
-        if (paymentLine.payment_method.use_payment_terminal === 'seerbit') {
-            this._reset_seerbit_state();
-            const { confirmed } = await this.popup.add(ConfirmPopup, {
-                title: _t('Seerbit Payment'),
-                body: _t('Do you want to proceed with Seerbit payment?'),
-            });
-            if (!confirmed) {
-                return;
-            }
-            return this._seerbit_pay(paymentLine);
-        }
-        return superMethod(paymentLine);
-    },
-    _reset_seerbit_state() {
+export class SeerbitPayment extends PaymentInterface {
+    constructor(pos, payment_method) {
+        super(pos, payment_method);
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
-        this.seerbit_supports_reversals = false; // Seerbit doesn't support reversals
+        this.supports_reversals = false; // Seerbit doesn't support reversals
         initializeSeerbitFirebase(this.env);
-    },
-    async _seerbit_pay(paymentLine) {
-        const order = this.currentOrder;
+    }
+
+    async send_payment_request(cid) {
+        const order = this.pos.get_order();
+        const paymentLine = order.selected_paymentline;
         if (paymentLine.amount < 0.01) {
-            await this.popup.add(ConfirmPopup, {
+            await this.env.services.popup.add(ConfirmPopup, {
                 title: _t('Amount Error'),
                 body: _t('Cannot process transactions with invalid amount.'),
             });
-            return;
+            return false;
         }
         paymentLine.set_payment_status('waitingSeerbit');
         return this._send_seerbit_payment_request_to_firestore(paymentLine);
-    },
+    }
+
     _seerbit_pay_data(paymentLine) {
-        const order = this.currentOrder;
+        const order = this.pos.get_order();
         const paymentMethod = paymentLine.payment_method;
         const now = new Date();
         const day = String(now.getDate()).padStart(2, '0');
@@ -82,9 +67,9 @@ patch(PaymentScreen, {
             "transactionRef": "",
             "pubkey": paymentMethod?.seerbit_public_key || "",
         };
-    },
+    }
+
     _send_seerbit_payment_request_to_firestore(paymentLine) {
-        const order = this.currentOrder;
         let payload;
         try {
             payload = this._seerbit_pay_data(paymentLine);
@@ -105,13 +90,14 @@ patch(PaymentScreen, {
             if (paymentLine?.set_payment_status) {
                 paymentLine.set_payment_status('waitingSeerbit');
             }
-            await this.popup.add(ConfirmPopup, {
+            await this.env.services.popup.add(ConfirmPopup, {
                 title: _t('Seerbit Warning'),
                 body: _t('Could not send payment request. You can force confirm if payment was made.'),
             });
-            return;
+            return false;
         });
-    },
+    }
+
     _seerbit_start_get_status_polling(paymentLine) {
         const self = this;
         return new Promise(function (resolve, reject) {
@@ -123,9 +109,10 @@ patch(PaymentScreen, {
         }).finally(function () {
             self._reset_seerbit_state();
         });
-    },
+    }
+
     _seerbit_poll_for_response(paymentLine, resolve, reject) {
-        if (this.seerbit_was_cancelled || !this.currentOrder.selected_paymentline) {
+        if (this.seerbit_was_cancelled || !this.pos.get_order().selected_paymentline) {
             return resolve(true);
         }
         const completedTransaction = localStorage.getItem('completed_transaction');
@@ -149,12 +136,30 @@ patch(PaymentScreen, {
                 if (paymentLine) {
                     paymentLine.set_payment_status('errorSeerbit');
                 }
-                this.popup.add(ConfirmPopup, {
+                this.env.services.popup.add(ConfirmPopup, {
                     title: _t('Odoo Error'),
                     body: _t('Error Marking payment as done'),
                 });
                 reject();
             }
         }
-    },
-});
+    }
+
+    _reset_seerbit_state() {
+        this.seerbit_polling = null;
+        this.seerbit_was_cancelled = false;
+        this.supports_reversals = false;
+        initializeSeerbitFirebase(this.env);
+    }
+
+    async send_payment_cancel(order, cid) {
+        this.seerbit_was_cancelled = true;
+        clearTimeout(this.seerbit_polling);
+        return Promise.resolve();
+    }
+
+    close() {
+        this.seerbit_was_cancelled = true;
+        clearTimeout(this.seerbit_polling);
+    }
+}
