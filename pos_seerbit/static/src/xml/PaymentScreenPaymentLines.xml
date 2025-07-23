@@ -11,7 +11,7 @@
                     <span>Waiting for Seerbit payment</span>
                 </div>
                 <div class="seerbit-buttons">
-                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="props.send_force_done(line)">
+                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => props.send_force_done(line)">
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
                 <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="() => props.send_payment_request(line)">
@@ -28,10 +28,10 @@
                     </span>
                     <span>Error with Seerbit payment</span>
                 </div>
-                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="props.send_payment_cancel(line)">
+                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => props.send_payment_cancel(line)">
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
-                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="props.send_payment_request(line)">
+                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="() => props.send_payment_request(line)">
                     <i class="fa fa-redo seerbit-icon" aria-hidden="true"/> Retry
                 </div>
             </t>
