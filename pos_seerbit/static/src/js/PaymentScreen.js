@@ -42,7 +42,7 @@ patch(PaymentScreen.prototype, {
         const payment_line = this.currentOrder.get_paymentline(line.cid);
         if (payment_line) {
             // This calls the method on our actual PaymentInterface
-            payment_line.payment_method.payment_terminal.force_done(line.cid);
+            payment_line.payment_method.payment_terminal.send_force_done(line.cid);
         }
     },
     

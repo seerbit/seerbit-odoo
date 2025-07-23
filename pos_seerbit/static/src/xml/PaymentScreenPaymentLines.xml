@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
     <t t-name="SeerbitPaymentScreenPaymentLines" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension" owl="1">
+        <xpath expr="//PaymentScreenPaymentLines" position="attributes">
+            <attribute name="send_payment_request">this.send_payment_request</attribute>
+            <attribute name="send_force_done">this.send_force_done</attribute>
+            <attribute name="send_payment_cancel">this.send_payment_cancel</attribute>
+        </xpath>
         <xpath expr="//div[contains(@class, 'electronic_payment')]" position="inside">
             <!-- Seerbit: Waiting for payment -->
             <t t-if="line.payment_status == 'waitingSeerbit'">
