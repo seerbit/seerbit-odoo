@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Registries } from '@web/core/registry';
+import { paymentMethods } from 'point_of_sale.models';
 import PaymentSeerbit from './payment_seerbit';
 
-Registries.Model.add('seerbit', PaymentSeerbit);
+paymentMethods.add('seerbit', PaymentSeerbit);
