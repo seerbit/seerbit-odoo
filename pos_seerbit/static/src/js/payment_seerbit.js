@@ -17,14 +17,12 @@ function initializeSeerbitFirebase() {
     });
 }
 
-patch(PaymentScreen.prototype, {
-    setup() {
-        super.setup();
-        // Always initialize Seerbit Firebase on PaymentScreen setup/init
+patch(PaymentScreen, {
+    setup(superSetup) {
+        superSetup();
         initializeSeerbitFirebase();
     },
-    async send_payment_request(paymentLine) {
-        // Only handle Seerbit payment lines, otherwise call the original
+    async send_payment_request(superMethod, paymentLine) {
         if (paymentLine.payment_method.use_payment_terminal === 'seerbit') {
             this._reset_seerbit_state();
             const { confirmed } = await this.popup.add(ConfirmPopup, {
@@ -36,8 +34,7 @@ patch(PaymentScreen.prototype, {
             }
             return this._seerbit_pay(paymentLine);
         }
-        // Fallback to original method for other payment lines
-        return super.send_payment_request(paymentLine);
+        return superMethod(paymentLine);
     },
     _reset_seerbit_state() {
         this.seerbit_polling = null;
