@@ -15,7 +15,7 @@
         - Configurable through Odoo settings
         
         # Compatibility:
-        - Odoo 16.0, 17.0, 18.0
+        - Odoo 17.0, 18.0
     """,
     "author": "Seerbit",
     "website": "https://github.com/seerbit/seerbit-odoo",
@@ -38,18 +38,6 @@
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
         ],
-        # Also load in POS bundle for POS-specific functionality
-        "point_of_sale.assets": [
-            "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
-            "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
-            "pos_seerbit/static/src/js/models.js",
-            "pos_seerbit/static/src/js/firebase_init.js",
-            "pos_seerbit/static/src/js/PaymentScreen.js",
-            "pos_seerbit/static/src/js/payment_seerbit.js",
-            "pos_seerbit/static/src/js/firebase_listener.js",
-            "pos_seerbit/static/src/scss/pos.scss",
-            "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
-        ],
         "point_of_sale._assets_pos": [
             
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
@@ -68,9 +56,10 @@
     "images": ["static/description/seerbit.gif"],
     "external_dependencies": {
         "python": [
-            "firebase-admin>=2.0.0",
-            "google-cloud-firestore>=2.0.0",
-            "google-auth>=2.0.0",
+            # Removed on 18.0
+            # "firebase-admin>=2.0.0",
+            # "google-cloud-firestore>=2.0.0",
+            # "google-auth>=2.0.0",
         ],
     },
 }
