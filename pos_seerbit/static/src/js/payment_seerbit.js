@@ -6,15 +6,15 @@ import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_pop
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
-// Accepts an rpc argument (this.pos.rpc)
+// Accepts an rpc argument (this.pos.env.services.rpc)
 function initializeSeerbitFirebase(rpc) {
     FirebaseInit.initializeFirebase(rpc).then(function(success) {
         if (!success) {
-            console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
-        }
-    }).catch(function(error) {
-        console.error('Firestore initialization error:', error);
-    });
+                    console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
+                }
+            }).catch(function(error) {
+                console.error('Firestore initialization error:', error);
+            });
 }
 
 export default class SeerbitPayment extends PaymentInterface {
@@ -23,11 +23,11 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false; // Seerbit doesn't support reversals
-        initializeSeerbitFirebase(this.pos.rpc);
+        initializeSeerbitFirebase(this.pos.env.services.rpc);
     }
 
     async send_payment_request(cid) {
-        const order = this.pos.get_order();
+            const order = this.pos.get_order();
         const paymentLine = order.selected_paymentline;
         if (paymentLine.amount < 0.01) {
             await this.env.services.popup.add(ConfirmPopup, {
@@ -43,51 +43,51 @@ export default class SeerbitPayment extends PaymentInterface {
     _seerbit_pay_data(paymentLine) {
         const order = this.pos.get_order();
         const paymentMethod = paymentLine.payment_method;
-        const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-        const receivedDateTime = `${day}/${month}/${year}`;
-        const metadata = JSON.stringify({
-            'created_by': 'odoo_pos_seerbit',
-            'created_time': now.toISOString(),
-            'order_id': order.uid,
-            'pos_config_id': this.pos.config?.id,
-            'user_id': this.pos.user?.id
-        });
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const receivedDateTime = `${day}/${month}/${year}`;
+            const metadata = JSON.stringify({
+                'created_by': 'odoo_pos_seerbit',
+                'created_time': now.toISOString(),
+                'order_id': order.uid,
+                'pos_config_id': this.pos.config?.id,
+                'user_id': this.pos.user?.id
+            });
         return {
-            "id": order.uid?.toString(),
-            "posid": paymentMethod?.seerbit_terminal_id || "",
-            "merchantid": "",
-            "metadata": metadata,
+                "id": order.uid?.toString(),
+                "posid": paymentMethod?.seerbit_terminal_id || "",
+                "merchantid": "",
+                "metadata": metadata,
             "transactionValue": paymentLine.amount?.toFixed(2),
-            "status": "open",
-            "transactionTime": "",
-            "sessionId": "",
-            "receivedDateTime": receivedDateTime,
-            "transactionRef": "",
-            "pubkey": paymentMethod?.seerbit_public_key || "",
-        };
+                "status": "open",
+                "transactionTime": "",
+                "sessionId": "",
+                "receivedDateTime": receivedDateTime,
+                "transactionRef": "",
+                "pubkey": paymentMethod?.seerbit_public_key || "",
+            };
     }
 
     _send_seerbit_payment_request_to_firestore(paymentLine) {
-        let payload;
-        try {
+            let payload;
+            try {
             payload = this._seerbit_pay_data(paymentLine);
-        } catch (error) {
-            console.error('Error creating payment payload:', error);
-            return Promise.reject(error);
-        }
-        return this.pos.rpc({
-            model: 'pos.payment.method',
-            method: 'send_seerbit_payment_request',
+            } catch (error) {
+                console.error('Error creating payment payload:', error);
+                return Promise.reject(error);
+            }
+        return this.pos.env.services.rpc.query({
+                model: 'pos.payment.method',
+                method: 'send_seerbit_payment_request',
             args: [[paymentLine.payment_method?.id], payload],
-        }).then(() => {
-            localStorage.setItem('pending_transaction', JSON.stringify(payload));
-            FirebaseListener.listenForReconciliation(payload.id);
+            }).then(() => {
+                localStorage.setItem('pending_transaction', JSON.stringify(payload));
+                FirebaseListener.listenForReconciliation(payload.id);
             return this._seerbit_start_get_status_polling(paymentLine);
         }).catch(async (error) => {
-            console.error('Payment request failed:', error);
+                console.error('Payment request failed:', error);
             if (paymentLine?.set_payment_status) {
                 paymentLine.set_payment_status('waitingSeerbit');
             }
@@ -106,7 +106,7 @@ export default class SeerbitPayment extends PaymentInterface {
             self._seerbit_poll_for_response(paymentLine, resolve, reject);
             self.seerbit_polling = setInterval(function () {
                 self._seerbit_poll_for_response(paymentLine, resolve, reject);
-            }, 3500);
+                }, 3500);
         }).finally(function () {
             self._reset_seerbit_state();
         });
@@ -114,26 +114,26 @@ export default class SeerbitPayment extends PaymentInterface {
 
     _seerbit_poll_for_response(paymentLine, resolve, reject) {
         if (this.seerbit_was_cancelled || !this.pos.get_order().selected_paymentline) {
-            return resolve(true);
-        }
-        const completedTransaction = localStorage.getItem('completed_transaction');
-        if (completedTransaction) {
-            try {
-                const transactionData = JSON.parse(completedTransaction);
+                return resolve(true);
+            }
+            const completedTransaction = localStorage.getItem('completed_transaction');
+            if (completedTransaction) {
+                try {
+                    const transactionData = JSON.parse(completedTransaction);
                 if (paymentLine) {
                     paymentLine.set_payment_status('done');
                     paymentLine.set_receipt_info('Transaction ID: ' + transactionData.id);
                     paymentLine.transaction_id = transactionData.id;
                     paymentLine.card_type = 'Seerbit';
                     paymentLine.cardholder_name = 'Seerbit Payment';
+                        localStorage.removeItem('completed_transaction');
+                        localStorage.removeItem('pending_transaction');
+                        resolve(true);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error parsing completed transaction:', error);
                     localStorage.removeItem('completed_transaction');
-                    localStorage.removeItem('pending_transaction');
-                    resolve(true);
-                    return;
-                }
-            } catch (error) {
-                console.error('Error parsing completed transaction:', error);
-                localStorage.removeItem('completed_transaction');
                 if (paymentLine) {
                     paymentLine.set_payment_status('errorSeerbit');
                 }
@@ -150,7 +150,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false;
-        initializeSeerbitFirebase(this.pos.rpc);
+        initializeSeerbitFirebase(this.pos.env.services.rpc);
     }
 
     async send_payment_cancel(order, cid) {
