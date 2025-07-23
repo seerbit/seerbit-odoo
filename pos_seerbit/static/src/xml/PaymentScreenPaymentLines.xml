@@ -11,10 +11,10 @@
                     <span>Waiting for Seerbit payment</span>
                 </div>
                 <div class="seerbit-buttons">
-                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="send_payment_cancel(line)">
+                <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => props.sendPaymentCancel(line)">
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
-                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="send_payment_request(line)">
+                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="() => props.sendPaymentRequest(line)">
                     <i class="fa fa-repeat seerbit-icon" aria-hidden="true"/> Retry
                 </div>
                                 </div>
