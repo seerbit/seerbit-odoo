@@ -22,6 +22,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/account_journal.xml",
+        "data/pos.payment.method.csv",
         "views/res_config_settings_views.xml",
         "views/pos_payment_method_views.xml",
     ],
@@ -38,7 +39,7 @@
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
         ],
-        "point_of_sale.assets": [
+        'point_of_sale._assets_pos': [
             # Seerbit POS assets
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
