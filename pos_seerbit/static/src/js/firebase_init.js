@@ -7,27 +7,24 @@ let firebaseInitialized = false;
 let firestoreDb = null;
 let initializationPromise = null;
 
-// Accepts an rpc argument (env.services.rpc or useService('rpc'))
-function initializeFirebase(rpc) {
+// Accepts an orm argument (env.services.orm or useService('orm'))
+function initializeFirebase(orm) {
         if (initializationPromise) {
             return initializationPromise;
         }
         if (firebaseInitialized && firestoreDb) {
             return Promise.resolve(true);
         }
-    if (!rpc) {
-        console.error('rpc is required for initializeFirebase');
+    if (!orm) {
+        console.error('orm is required for initializeFirebase');
         return Promise.resolve(false);
     }
-    // rpc can be either a function (this.pos.rpc) or an object with .query (useService('rpc'))
-    const rpcCall = typeof rpc === 'function' ?
-        (params) => rpc(params) :
-        (params) => rpc.query(params);
-    initializationPromise = rpcCall({
-            model: 'pos.payment.method',
-            method: 'get_firestore_config',
-            args: [],
-        }).then(function(config) {
+    initializationPromise = orm.call(
+        'pos.payment.method',
+        'get_firestore_config',
+        [],
+        {}
+    ).then(function(config) {
             if (!config) {
                 console.error('No Firestore configuration received from server');
                 return false;
@@ -85,11 +82,11 @@ function initializeFirebase(rpc) {
     };
 }
 
-function reinitializeFirebase(rpc) {
+function reinitializeFirebase(orm) {
     firebaseInitialized = false;
     firestoreDb = null;
     initializationPromise = null;
-    return initializeFirebase(rpc);
+    return initializeFirebase(orm);
 }
 
 export default {

@@ -9,7 +9,7 @@ import FirebaseInit from './firebase_init';
 function listenForReconciliation(transactionId) {
     if (!FirebaseInit.isFirebaseAvailable()) {
         console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
-        FirebaseInit.reinitializeFirebase(window.__owl__.root.env.services.rpc).then(function(success) {
+        FirebaseInit.reinitializeFirebase(window.__owl__.root.env.services.orm).then(function(success) {
             if (success) {
                 listenForReconciliation(transactionId);
             } else {

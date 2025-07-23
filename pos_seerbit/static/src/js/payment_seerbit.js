@@ -6,15 +6,15 @@ import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_pop
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
-// Accepts an rpc argument (this.pos.env.services.rpc)
-function initializeSeerbitFirebase(rpc) {
-    FirebaseInit.initializeFirebase(rpc).then(function(success) {
+// Accepts an orm argument (this.pos.env.services.orm)
+function initializeSeerbitFirebase(orm) {
+    FirebaseInit.initializeFirebase(orm).then(function(success) {
         if (!success) {
-                    console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
-                }
-            }).catch(function(error) {
-                console.error('Firestore initialization error:', error);
-            });
+            console.warn('Firestore initialization failed for Seerbit payments. Status:', FirebaseInit.getFirebaseStatus());
+        }
+    }).catch(function(error) {
+        console.error('Firestore initialization error:', error);
+    });
 }
 
 export default class SeerbitPayment extends PaymentInterface {
@@ -23,7 +23,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false; // Seerbit doesn't support reversals
-        initializeSeerbitFirebase(this.pos.env.services.rpc);
+        initializeSeerbitFirebase(this.pos.env.services.orm);
     }
 
     async send_payment_request(cid) {
@@ -78,11 +78,12 @@ export default class SeerbitPayment extends PaymentInterface {
                 console.error('Error creating payment payload:', error);
                 return Promise.reject(error);
             }
-        return this.pos.env.services.rpc.query({
-                model: 'pos.payment.method',
-                method: 'send_seerbit_payment_request',
-            args: [[paymentLine.payment_method?.id], payload],
-            }).then(() => {
+        return this.pos.env.services.orm.call(
+            'pos.payment.method',
+            'send_seerbit_payment_request',
+            [[paymentLine.payment_method?.id], payload],
+            {}
+        ).then(() => {
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
                 FirebaseListener.listenForReconciliation(payload.id);
             return this._seerbit_start_get_status_polling(paymentLine);
@@ -150,7 +151,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false;
-        initializeSeerbitFirebase(this.pos.env.services.rpc);
+        initializeSeerbitFirebase(this.pos.env.services.orm);
     }
 
     async send_payment_cancel(order, cid) {
