@@ -48,7 +48,7 @@
             "pos_seerbit/static/src/scss/pos.scss",
             "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
         ],
-        "point_of_sale.assets_prod": [
+        "point_of_sale._assets_pos": [
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/PaymentScreen.js",
