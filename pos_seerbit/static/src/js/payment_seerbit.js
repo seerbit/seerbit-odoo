@@ -159,6 +159,16 @@ export default class SeerbitPayment extends PaymentInterface {
         clearTimeout(this.seerbit_polling);
         return Promise.resolve();
     }
+    send_force_done(line) {
+        if (line && line.payment_method && line.payment_method.use_payment_terminal && line.payment_method.technical_name === 'seerbit') {
+            line.set_payment_status('done');
+            this.env.services.popup.add({
+                title: 'Seerbit Payment',
+                body: 'Payment forcibly confirmed as done.',
+            });
+            this.render();
+        }
+    }
 
     close() {
         this.seerbit_was_cancelled = true;
