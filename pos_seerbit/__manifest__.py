@@ -23,6 +23,7 @@
         "security/ir.model.access.csv",
         "data/account_journal.xml",
         "data/pos.payment.method.csv",
+        "pos_seerbit/data/pos.payment.method.csv",
         "views/res_config_settings_views.xml",
         "views/pos_payment_method_views.xml",
     ],
