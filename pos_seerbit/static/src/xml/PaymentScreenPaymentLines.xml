@@ -8,7 +8,7 @@
                     <span class="seerbit-icon" aria-hidden="true">
                         <i class="fa fa-hourglass-half"/>
                     </span>
-                    <span>Waiting for Seerbit payment</span>
+                    <span>Waiting for Terminal Payment</span>
                 </div>
                 <div class="seerbit-buttons">
                 <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => this.props.sendForceDone(line)">

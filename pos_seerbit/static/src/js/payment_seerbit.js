@@ -157,6 +157,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_payment_cancel(order, cid) {
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
+        return Promise.resolve();
     }
 
     send_force_done(line) {
