@@ -16,7 +16,7 @@ function initializeSeerbitFirebase(env) {
     });
 }
 
-export class SeerbitPayment extends PaymentInterface {
+export default class SeerbitPayment extends PaymentInterface {
     constructor(pos, payment_method) {
         super(pos, payment_method);
         this.seerbit_polling = null;
