@@ -4,14 +4,13 @@ import { _t } from '@web/core/l10n/translation';
 import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_popup';
 import FirebaseInit from './firebase_init';
 
-
-
-function listenForReconciliation(transactionId) {
+// Listen for payment reconciliation updates
+function listenForReconciliation(transactionId, env) {
     if (!FirebaseInit.isFirebaseAvailable()) {
         console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
         FirebaseInit.reinitializeFirebase(window.__owl__.root.env.services.orm).then(function(success) {
             if (success) {
-                listenForReconciliation(transactionId);
+                listenForReconciliation(transactionId, env);
             } else {
                 console.error('Failed to reinitialize Firestore');
             }
@@ -31,7 +30,7 @@ function listenForReconciliation(transactionId) {
                 const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
                 if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) ) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
-                    await window.__owl__.root.env.services.popup.add(ConfirmPopup, {
+                    await env.services.popup.add(ConfirmPopup, {
                         title: _t('Payment Successful'),
                         body: _t('Payment has been successfully processed.'),
                     });
