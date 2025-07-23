@@ -19,32 +19,6 @@ patch(PaymentScreen.prototype, {
         });
     },
 
-    // We are adding the new methods here
-    
-    /**
-     * This method is called when the 'Retry' button is clicked.
-     * It finds the correct payment interface and calls its send_payment_request method.
-     * @param {Object} line The payment line object passed from the template.
-     */
-    async send_payment_request(line) {
-        const payment_line = this.currentOrder.get_paymentline(line.cid);
-        if (payment_line) {
-            // This calls the method on our actual PaymentInterface
-            payment_line.payment_method.payment_terminal.send_payment_request(line.cid);
-        }
-    },
-
-    /**
-     * This method handles the 'Force Confirm' action.
-     * @param {Object} line The payment line object passed from the template.
-     */
-    async send_force_done(line) {
-        const payment_line = this.currentOrder.get_paymentline(line.cid);
-        if (payment_line) {
-            // This calls the method on our actual PaymentInterface
-            payment_line.payment_method.payment_terminal.send_force_done(line.cid);
-        }
-    },
     
     
 });
