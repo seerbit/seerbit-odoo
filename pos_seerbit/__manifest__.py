@@ -56,7 +56,7 @@
     "images": ["static/description/seerbit.gif"],
     "external_dependencies": {
         "python": [
-            # Removed on 18.0
+            # Removed for 18.0
             # "firebase-admin>=2.0.0",
             # "google-cloud-firestore>=2.0.0",
             # "google-auth>=2.0.0",

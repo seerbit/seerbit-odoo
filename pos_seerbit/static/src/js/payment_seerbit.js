@@ -2,7 +2,7 @@
 
 import { PaymentInterface } from '@point_of_sale/app/payment/payment_interface';
 import { _t } from '@web/core/l10n/translation';
-import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_popup';
+import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
@@ -30,7 +30,7 @@ export default class SeerbitPayment extends PaymentInterface {
         const order = this.pos.get_order();
         const paymentLine = order.selected_paymentline;
         if (paymentLine.amount < 0.01) {
-            await this.env.services.popup.add(ConfirmPopup, {
+            await this.env.services.dialog.add(AlertDialog, {
                 title: _t('Amount Error'),
                 body: _t('Cannot process transactions with invalid amount.'),
             });
@@ -92,7 +92,7 @@ export default class SeerbitPayment extends PaymentInterface {
             if (paymentLine?.set_payment_status) {
                 paymentLine.set_payment_status('waitingSeerbit');
             }
-            await this.env.services.popup.add(ConfirmPopup, {
+            await this.env.services.dialog.add(AlertDialog, {
                 title: _t('Seerbit Warning'),
                 body: _t('Could not send payment request. You can force confirm if payment was made.'),
             });
@@ -138,7 +138,7 @@ export default class SeerbitPayment extends PaymentInterface {
                 if (paymentLine) {
                     paymentLine.set_payment_status('errorSeerbit');
                 }
-                this.env.services.popup.add(ConfirmPopup, {
+                this.env.services.dialog.add(AlertDialog, {
                     title: _t('Odoo Error'),
                     body: _t('Error Marking payment as done'),
                 });
@@ -163,7 +163,7 @@ export default class SeerbitPayment extends PaymentInterface {
     send_force_done(line) {
         if (line && line.payment_method && line.payment_method.use_payment_terminal && line.payment_method.technical_name === 'seerbit') {
             line.set_payment_status('done');
-            this.env.services.popup.add({
+            this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
                 body: 'Payment forcibly confirmed as done.',
             });

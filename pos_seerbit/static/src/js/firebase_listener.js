@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { _t } from '@web/core/l10n/translation';
-import { ConfirmPopup } from '@point_of_sale/app/utils/confirm_popup/confirm_popup';
+import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
 import FirebaseInit from './firebase_init';
 
 // Listen for payment reconciliation updates
@@ -30,7 +30,7 @@ function listenForReconciliation(transactionId, env) {
                 const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
                 if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) ) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
-                    await env.services.popup.add(ConfirmPopup, {
+                    await env.services.dialog.add(AlertDialog, {
                         title: _t('Payment Successful'),
                         body: _t('Payment has been successfully processed.'),
                     });
