@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
     <t t-name="SeerbitPaymentScreenPaymentLines" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension" owl="1">
-        <xpath expr="//div[contains(@class, 'electronic_payment')]" position="inside">
+        <xpath expr="//div[contains(@class, 'paymentline') and contains(@class, 'electronic_payment')]" position="inside">
             <!-- Seerbit: Waiting for payment -->
             <t t-if="line.payment_status == 'waitingSeerbit'">
                 <div class="electronic_status waiting" aria-live="polite">
@@ -14,11 +14,10 @@
                 <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => this.props.sendForceDone(line)">
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
-                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="() => this.props.sendPaymentRequest(line)">
+                <div class="button send_payment_request highlight" title="Retry Payment Request" aria-label="Retry Payment Request" t-on-click="() => props.sendPaymentRequest(line)">
                     <i class="fa fa-repeat seerbit-icon" aria-hidden="true"/> Retry
                 </div>
-                                </div>
-
+                </div>
             </t>
             <!-- Seerbit: Error -->
             <t t-elif="line.payment_status == 'errorSeerbit'">
@@ -31,8 +30,8 @@
                 <div class="button send_force_done dangerous" title="Force Done" aria-label="Force Confirm" t-on-click="() => this.props.sendForceDone(line)">
                     <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                 </div>
-                <div class="button send_payment_request highlight" title="Send Payment Request" aria-label="Retry Payment Request" t-on-click="() => this.props.sendPaymentRequest(line)">
-                    <i class="fa fa-redo seerbit-icon" aria-hidden="true"/> Retry
+                <div class="button send_payment_request highlight" title="Retry Payment Request" aria-label="Retry Payment Request" t-on-click="() => props.sendPaymentRequest(line)">
+                    <i class="fa fa-repeat seerbit-icon" aria-hidden="true"/> Retry
                 </div>
             </t>
         </xpath>
