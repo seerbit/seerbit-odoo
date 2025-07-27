@@ -52,7 +52,14 @@ export default class SeerbitPayment extends PaymentInterface {
 
     _seerbit_pay_data(paymentLine) {
         const order = this.pos.get_order();
-        const paymentMethod = this.payment_method_id;
+        const paymentMethod = this.pos.payment_methods.find(pm => pm.id === this.payment_method_id);
+
+        // A check to prevent errors if the method isn't found
+        if (!paymentMethod) {
+            console.error("Seerbit: Payment method not found!", this.pos);
+            return {};
+        }
+
             const now = new Date();
             const day = String(now.getDate()).padStart(2, '0');
             const month = String(now.getMonth() + 1).padStart(2, '0');
