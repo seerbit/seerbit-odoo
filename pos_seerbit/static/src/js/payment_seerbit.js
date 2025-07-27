@@ -46,6 +46,11 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_payment_cancel(order, cid) {
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
+        
+        // Clean up localStorage when payment is cancelled
+        localStorage.removeItem('pending_transaction');
+        localStorage.removeItem('completed_transaction');
+        
         return Promise.resolve();
     }
 
@@ -175,8 +180,13 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
-            line.set_receipt_info('Transaction ID: ' + this.pos.get_order().uid?.toString());
+            // line.set_receipt_info('Transaction ID: ' + this.pos.get_order().uid?.toString());
             clearTimeout(this.seerbit_polling);
+            
+            // Clean up localStorage to prevent "electronic payment in progress" error
+            localStorage.removeItem('pending_transaction');
+            localStorage.removeItem('completed_transaction');
+            
             await this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
                 body: 'Payment forcibly confirmed as done.',
@@ -188,5 +198,9 @@ export default class SeerbitPayment extends PaymentInterface {
     close() {
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
+        
+        // Clean up localStorage when closing to prevent stale state
+        localStorage.removeItem('pending_transaction');
+        localStorage.removeItem('completed_transaction');
     }
 }
