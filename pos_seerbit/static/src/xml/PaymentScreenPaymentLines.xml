@@ -2,6 +2,7 @@
 <templates id="template" xml:space="preserve">
     <t t-name="SeerbitPaymentScreenPaymentLines"
        t-inherit="point_of_sale.PaymentScreenPaymentLines"
+       
        t-inherit-mode="extension"
        owl="1">
 
@@ -45,6 +46,7 @@
                     <div class="button send_force_done dangerous"
                          title="Force Done"
                          aria-label="Force Confirm"
+                         
                          t-on-click="() => this.props.sendForceDone(line)">
                         <i class="fa fa-bolt seerbit-icon" aria-hidden="true"/> Force Confirm
                     </div>
