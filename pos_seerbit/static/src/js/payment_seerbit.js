@@ -29,7 +29,7 @@ export default class SeerbitPayment extends PaymentInterface {
         initializeSeerbitFirebase(this.pos.env.services.orm);
     }
 
-    async sendPaymentRequest(cid) {
+    async send_payment_request(cid) {
             const order = this.pos.get_order();
         const paymentLine = order.get_selected_paymentline();
         if (paymentLine.amount < 0.01) {
@@ -43,11 +43,12 @@ export default class SeerbitPayment extends PaymentInterface {
         return this._send_seerbit_payment_request_to_firestore(paymentLine);
     }
 
-    async sendPaymentCancel(order, cid) {
+    async send_payment_cancel(order, cid) {
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
         return Promise.resolve();
     }
+
 
     _seerbit_pay_data(paymentLine) {
             const order = this.pos.get_order();
@@ -170,9 +171,8 @@ export default class SeerbitPayment extends PaymentInterface {
         initializeSeerbitFirebase(this.pos.env.services.orm);
     }
 
-    
 
-    async sendForceDone(line) {
+    async send_force_done(line) {
         console.log('line force triggered', line);
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             console.log('line force done', line);
@@ -181,7 +181,6 @@ export default class SeerbitPayment extends PaymentInterface {
                 title: 'Seerbit Payment',
                 body: 'Payment forcibly confirmed as done.',
             });
-            this.render();
         }
     }
 
