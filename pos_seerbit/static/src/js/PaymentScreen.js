@@ -20,8 +20,7 @@ patch(PaymentScreen.prototype, {
     async sendForceDone(line) {
         const payment_terminal = line.payment_method_id.payment_terminal;
          await payment_terminal.send_force_done(
-            this.currentOrder,
-            line.uuid
+            line
         );
     }
 });
