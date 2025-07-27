@@ -127,13 +127,16 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     _seerbit_poll_for_response(paymentLine, resolve, reject) {
-        if (this.seerbit_was_cancelled || !this.pos.get_order().get_selected_paymentline()) {
+        if (this.seerbit_was_cancelled) {
             console.log('seerbit_was_cancelled', this.seerbit_was_cancelled);
             paymentLine.set_payment_status('waitingSeerbit');
             return resolve(true);
+        }
+        if (!this.pos.get_order().get_selected_paymentline()) {
+            console.log('no payment line');
+            return;
             }
             const completedTransaction = localStorage.getItem('completed_transaction');
-             console.log('completedTransaction', completedTransaction);
             if (completedTransaction) {
                 try {
                     const transactionData = JSON.parse(completedTransaction);
