@@ -174,10 +174,8 @@ export default class SeerbitPayment extends PaymentInterface {
 
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
-            let order = this.pos.get_order();
             line.set_payment_status('done');
-
-            line.set_receipt_info('Transaction ID: ' + order.uid.toString());
+            line.set_receipt_info('Transaction ID: ' + this.pos.get_order().uid?.toString());
             clearTimeout(this.seerbit_polling);
             await this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
