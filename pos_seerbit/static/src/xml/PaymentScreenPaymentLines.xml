@@ -6,7 +6,8 @@
        owl="1">
 
         <!-- Match the exact structure in Odoo 18 -->
-        <xpath expr="//t[t-if='line and line.payment_status']/div[contains(@class, 'electronic_payment')]" position="inside">
+           <xpath expr="//div[contains(@t-attf-class, 'electronic_payment')]" position="inside">
+
 
             <!-- Seerbit: Waiting for payment -->
             <t t-if="line.payment_status == 'waitingSeerbit'">

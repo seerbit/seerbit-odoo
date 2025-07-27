@@ -159,9 +159,7 @@ def send_to_firestore_transactions(env, payload):
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
-    def _get_payment_terminal_selection(self):
-        return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
-
+    
     # Seerbit Fields
     seerbit_public_key = fields.Char(
         string="Seerbit Public Key", 
@@ -178,6 +176,25 @@ class PosPaymentMethod(models.Model):
         groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
+    def _get_payment_terminal_selection(self):
+        
+        return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
+
+    def _get_pos_ui_pos_payment_method(self, params):
+        """
+        Overrides the base method to add custom fields to the list of fields
+        sent to the Point of Sale frontend.
+        """
+        # Get the original list of fields from the parent method
+        fields_to_load = super()._get_pos_ui_pos_payment_method(params)
+        
+        # Add your new custom field names to the list
+        custom_fields = ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
+        
+        # Using a set for efficient duplicate removal before converting back to list
+        fields_to_load = list(set(fields_to_load + custom_fields))
+        
+        return fields_to_load
     @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:

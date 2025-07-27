@@ -2,22 +2,27 @@ from odoo import api
 import base64
 import os
 import logging
+from odoo import SUPERUSER_ID
 
 _logger = logging.getLogger(__name__)
-
 
 def post_init_hook(env):
     """
     Safely ensure the Seerbit journal and payment method exist after module installation.
-    This function handles existing records gracefully and updates them if needed.
+    Uses the SUPERUSER_ID's default company, or falls back to the first available company.
     """
     try:
-        company = env['res.company'].search([], limit=1)
+        # Get the superuser (admin)
+        user = env['res.users'].browse(SUPERUSER_ID)
+        
+        # Use superuser's default company, or fall back to any available company
+        company = user.company_id or env['res.company'].search([], limit=1)
+        
+        currency = company.currency_id
+        _logger.info(f"Company: {company.name}, Currency: {currency.name}")
         if not company:
             _logger.warning("No company found, skipping Seerbit setup")
             return
-            
-        currency = company.currency_id
         if not currency:
             currency = env.ref('base.USD', raise_if_not_found=False)
             if not currency:
@@ -25,7 +30,7 @@ def post_init_hook(env):
                 return
 
         # Safely handle the Seerbit journal
-        journal = env['account.journal'].search([('code', '=', 'SEER')], limit=1)
+        journal = env['account.journal'].search([('code', '=', 'SEER'), ('company_id', '=', company.id)], limit=1)
         if not journal:
             # Create new journal
             journal = env['account.journal'].create({
@@ -80,6 +85,8 @@ def post_init_hook(env):
                 update_values['receivable_account_id'] = receivable_account.id
             if payment_method.is_cash_count:
                 update_values['is_cash_count'] = False
+            if payment_method.company_id != company:
+                update_values['company_id'] = company.id
             
             if update_values:
                 payment_method.write(update_values)
@@ -91,7 +98,7 @@ def post_init_hook(env):
         
         # Set image for Seerbit payment method if it exists
         if payment_method:
-            logo_path = os.path.join(os.path.dirname(__file__), '../static/description/seerbit_logo.png')
+            logo_path = os.path.join(os.path.dirname(__file__), 'static/description/seerbit_logo.png')
             logo_path = os.path.abspath(logo_path)
             if os.path.exists(logo_path):
                 try:

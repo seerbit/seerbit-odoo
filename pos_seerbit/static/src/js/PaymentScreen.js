@@ -10,14 +10,11 @@ patch(PaymentScreen.prototype, {
         super.setup();
         onMounted(() => {
             // Set pending Seerbit payments to waiting status
-            const pendingPaymentLine = this.currentOrder.paymentlines.find(
-                paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' &&
-                    (!paymentLine.is_done() && paymentLine.get_payment_status() !== 'pending')
-            );
+            const pendingPaymentLine = this.env.services.pos.getPendingPaymentLine('seerbit')
             if (pendingPaymentLine) {
-                const paymentTerminal = pendingPaymentLine.payment_method.payment_terminal;
                 pendingPaymentLine.set_payment_status('waitingSeerbit');
             }
         });
-    },
+
+    }
 });
