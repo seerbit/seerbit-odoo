@@ -51,9 +51,10 @@ export default class SeerbitPayment extends PaymentInterface {
 
 
     _seerbit_pay_data(paymentLine) {
-        const order = this.pos.get_order();
-        const paymentMethod = paymentLine.payment_method;
-        console.log('paymentMethod', paymentMethod);
+            const order = this.pos.get_order();
+            const paymentMethod = this.payment_method_id;
+            console.log('paymentLine', paymentLine);
+            console.log('paymentMethod', paymentMethod);
 
             const now = new Date();
             const day = String(now.getDate()).padStart(2, '0');
