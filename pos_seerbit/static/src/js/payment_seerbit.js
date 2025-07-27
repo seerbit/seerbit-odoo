@@ -32,6 +32,17 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_payment_request(cid) {
             const order = this.pos.get_order();
         const paymentLine = order.get_selected_paymentline();
+        
+        // Check if there's already a pending transaction
+        const pendingTransaction = localStorage.getItem('pending_transaction');
+        if (pendingTransaction) {
+            await this.env.services.dialog.add(AlertDialog, {
+                title: _t('Payment in Progress'),
+                body: _t('There is already an electronic payment in progress. Please wait for it to complete or force confirm it.'),
+            });
+            return false;
+        }
+        
         if (paymentLine.amount < 0.01) {
             await this.env.services.dialog.add(AlertDialog, {
                 title: _t('Amount Error'),
@@ -46,11 +57,6 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_payment_cancel(order, cid) {
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
-        
-        // Clean up localStorage when payment is cancelled
-        localStorage.removeItem('pending_transaction');
-        localStorage.removeItem('completed_transaction');
-        
         return Promise.resolve();
     }
 
