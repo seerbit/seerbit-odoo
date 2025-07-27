@@ -53,8 +53,6 @@ export default class SeerbitPayment extends PaymentInterface {
     _seerbit_pay_data(paymentLine) {
             const order = this.pos.get_order();
             const paymentMethod = this.payment_method_id;
-            console.log('paymentLine', paymentLine);
-            console.log('paymentMethod', paymentMethod);
 
             const now = new Date();
             const day = String(now.getDate()).padStart(2, '0');
@@ -180,7 +178,8 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     send_force_done(line) {
-        if (line && line.payment_method && line.payment_method.use_payment_terminal && line.payment_method.technical_name === 'seerbit') {
+        if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
+            console.log('line force done', line);
             line.set_payment_status('done');
             this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
