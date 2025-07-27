@@ -174,12 +174,13 @@ export default class SeerbitPayment extends PaymentInterface {
 
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
-            console.log('line force done', line);
             line.set_payment_status('done');
+
             await this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
                 body: 'Payment forcibly confirmed as done.',
             });
+            this.render();  
         }
     }
 
