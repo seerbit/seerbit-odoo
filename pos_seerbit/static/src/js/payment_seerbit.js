@@ -131,7 +131,7 @@ export default class SeerbitPayment extends PaymentInterface {
             return resolve(true);
         }
         if (!this.pos.get_order().get_selected_paymentline()) {
-            console.log('no payment line');
+            console.log('No payment line');
             return;
             }
             const completedTransaction = localStorage.getItem('completed_transaction');
@@ -175,8 +175,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
-            line.set_receipt_info('Transaction ID: ' + line.pos_order_id?.uid?.toString());
-            console.log('line.pos_order_id', line.pos_order_id);
+            line.set_receipt_info('Transaction ID: ' + line.pos_order_id?.uuid?.toString());
             clearTimeout(this.seerbit_polling);
             
             // Clean up localStorage to prevent "electronic payment in progress" error

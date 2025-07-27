@@ -75,6 +75,7 @@ $seerbit-transition: all 0.15s cubic-bezier(0.4,0,0.2,1);
     margin-bottom: 0.5em;
     padding: 0.5em 0.75em;
     border-radius: $seerbit-border-radius;
+    margin-top:5px;
     box-shadow: $seerbit-shadow;
     &.waiting {
         background: $seerbit-waiting;
