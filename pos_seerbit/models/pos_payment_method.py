@@ -180,21 +180,12 @@ class PosPaymentMethod(models.Model):
         
         return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
 
-    def _get_pos_ui_pos_payment_method(self, params):
-        """
-        Overrides the base method to add custom fields to the list of fields
-        sent to the Point of Sale frontend.
-        """
-        # Get the original list of fields from the parent method
-        fields_to_load = super()._get_pos_ui_pos_payment_method(params)
-        
-        # Add your new custom field names to the list
-        custom_fields = ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
-        
-        # Using a set for efficient duplicate removal before converting back to list
-        fields_to_load = list(set(fields_to_load + custom_fields))
-        
-        return fields_to_load
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+       data = super()._load_pos_data_fields(config_id)
+       data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
+       return data
     @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
