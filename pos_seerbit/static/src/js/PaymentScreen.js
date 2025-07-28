@@ -7,7 +7,7 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
     const PosSeerbitPaymentScreen = PaymentScreen => class extends PaymentScreen {
         setup() {
-        super.setup();
+            super.setup();
             onMounted(() => {
                 const pendingPaymentLine = this.currentOrder.paymentlines.find(
                     paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' &&
@@ -27,9 +27,8 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                 }
             });
         }
-    };
+    }
 
     Registries.Component.extend(PaymentScreen, PosSeerbitPaymentScreen);
-
     return PaymentScreen;
 });

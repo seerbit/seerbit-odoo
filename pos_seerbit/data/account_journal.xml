@@ -4,5 +4,8 @@
         <field name="name">Seerbit</field>
         <field name="type">bank</field>
         <field name="code">SEER</field>
+        <field name="currency_id" ref="base.USD"/>
+        <field name="show_on_dashboard" eval="True"/>
+        <field name="active" eval="True"/>
     </record>
 </odoo>

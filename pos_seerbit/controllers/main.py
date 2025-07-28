@@ -1,23 +1,24 @@
 # coding: utf-8
-import requests
 import json
 import logging
 import pprint
 
 from odoo import http
+from odoo.http import Response, request
+from werkzeug.exceptions import Forbidden
 
 _logger = logging.getLogger(__name__)
 
 
-class PosSeerbitController(http.Controller):
-    '''
-    This is the webhook intended for listening to only Seerbit notifications
-    It is understandable that a bad actor can choose post a fake "Seerbit-like"
-        notification to this endpoint and in turn leads to wrong validation,
-        as such, received notifications needs to be re-verified.
-    '''
-    @http.route('/pos_seerbit/notification', type='json', methods=['POST'], auth='none', csrf=False)
-    def notification(self):
+class SeerbitController(http.Controller):
+    @http.route('/pos_seerbit/notification', type='json', auth='public', methods=['POST'], csrf=False)
+    def seerbit_notification(self, **kwargs):
+        '''
+        This is the webhook intended for listening to only Seerbit notifications
+        It is understandable that a bad actor can choose post a fake "Seerbit-like"
+            notification to this endpoint and in turn leads to wrong validation,
+            as such, received notifications needs to be re-verified.
+        '''
         data = json.loads(http.request.httprequest.data)
         # Ignore unknown ill-formed data
         try:
@@ -42,5 +43,8 @@ class PosSeerbitController(http.Controller):
                             notification["data"]["publicKey"])
         
         except Exception as e:
-            _logger.info('Unable to process notification:\n%s', pprint.pformat(data))
-            _logger.info('Encounted Exception:\n%s', e)
+            _logger.error(
+                "Error processing reconciliation notification: %s", str(e))
+            return {'status': 'error', 'message': f'Processing error: {str(e)}'}
+
+
