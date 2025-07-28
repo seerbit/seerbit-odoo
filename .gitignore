@@ -1,2 +1,155 @@
-__pycache__
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+*.sublime-project
+*.sublime-workspace
+.atom/
+.brackets.json
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+tests
+
+# Linting and formatting
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Odoo specific
+*.log
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+addons_path.txt
+odoo.conf
+odoo-bin
+odoo-server.conf
+odoo-dev.conf
+odoo-test.conf
+odoo-data/
+odoo-filestore/
+odoo-sessions/
+
+
+test_backend_firestore.py
+test_firestore.html
+test_implementation_verification.py
+
+
+# OS specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Documentation
+docs/_build/
+docs/build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node modules (if using any frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.orig
+*.rej
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache/
+.pytest_cache/
+
+# Local development
+local_settings.py
+settings_local.py
+.env.local
+.env.development
+.env.test
+.env.production
+config.local.py
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Backup and temporary
+*.swp
+*.swo
+*~
+
+
+requirements-dev.txt
+.pre-commit-config.yaml
+pyproject.toml
