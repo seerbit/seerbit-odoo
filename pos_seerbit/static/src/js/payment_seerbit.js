@@ -50,6 +50,7 @@ export default class SeerbitPayment extends PaymentInterface {
         localStorage.removeItem('pending_transaction');
         localStorage.removeItem('completed_transaction');
         this._reset_seerbit_state();
+
         return true;
     }
 
