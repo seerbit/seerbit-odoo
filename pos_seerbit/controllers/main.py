@@ -36,11 +36,11 @@ class SeerbitController(http.Controller):
                     payment_method.seerbit_latest_response = json.dumps(notification)
                     _logger.info('A payment notification has been saved')
                 else:
-                    _logger.info('A non-approved notification received from seerbit:\n%s',
-                                pprint.pformat(data))
+                    _logger.info('A non-approved notification received from Seerbit for transaction: %s',
+                                notification.get("data", {}).get("transactionRef", "unknown"))
             else:
-                _logger.error('Received a message with an invalid publickey: %s',
-                            notification["data"]["publicKey"])
+                _logger.error('Received a message with an invalid public key for transaction: %s',
+                            notification.get("data", {}).get("transactionRef", "unknown"))
         
         except Exception as e:
             _logger.error(

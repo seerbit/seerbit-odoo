@@ -9,3 +9,4 @@ google-auth>=2.0.0
 # Additional Google Cloud dependencies (optional but recommended)
 google-cloud-core>=2.0.0
 google-api-core>=2.0.0
+
