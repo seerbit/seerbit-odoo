@@ -47,16 +47,13 @@ patch(PaymentScreen.prototype, {
             return;
         }
         if (["waiting", "waitingSeerbit", "waitingCard", "timeout"].includes(line.get_payment_status()) && line.payment_method_id.payment_terminal) {
-            console.log('cancelling seerbit payment', uuid);
             line.set_payment_status("waitingCancel");
             line.payment_method_id.payment_terminal.send_payment_cancel(this.currentOrder, uuid).then( () => {
                 this.currentOrder.remove_paymentline(line);
                 this.numberBuffer.reset();
-                console.log('cancelled seerbit payment', uuid);
             }
             );
         } else if (line.get_payment_status() !== "waitingCancel") {
-            console.log('removing seerbit payment', uuid);
             this.currentOrder.remove_paymentline(line);
             this.numberBuffer.reset();
         }

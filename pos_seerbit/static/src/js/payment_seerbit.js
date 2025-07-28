@@ -44,12 +44,12 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     async send_payment_cancel(order, uuid) {
-        console.log('payment canceled', order, uuid);
 
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
         localStorage.removeItem('pending_transaction');
         localStorage.removeItem('completed_transaction');
+        this._reset_seerbit_state();
         return true;
     }
 
@@ -172,6 +172,7 @@ export default class SeerbitPayment extends PaymentInterface {
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false;
+        
         initializeSeerbitFirebase(this.pos.env.services.orm);
     }
 
