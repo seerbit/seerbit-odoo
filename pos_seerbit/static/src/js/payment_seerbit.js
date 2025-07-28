@@ -50,7 +50,7 @@ export default class SeerbitPayment extends PaymentInterface {
         clearTimeout(this.seerbit_polling);
         localStorage.removeItem('pending_transaction');
         localStorage.removeItem('completed_transaction');
-        return true
+        return true;
     }
 
 
@@ -197,7 +197,6 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     close() {
-        console.log('closing seerbit payment');
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
         
