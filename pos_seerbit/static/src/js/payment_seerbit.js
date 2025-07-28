@@ -43,8 +43,8 @@ export default class SeerbitPayment extends PaymentInterface {
         return this._send_seerbit_payment_request_to_firestore(paymentLine);
     }
 
-    async send_payment_cancel(order, line) {
-        console.log('payment canceled', order, line);
+    async send_payment_cancel(order, uuid) {
+        console.log('payment canceled', order, uuid);
         this.seerbit_was_cancelled = true;
         clearTimeout(this.seerbit_polling);
         localStorage.removeItem('pending_transaction');
