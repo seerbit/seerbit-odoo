@@ -28,7 +28,7 @@ function listenForReconciliation(transactionId, env) {
             if (change.type === 'added') {
                 const data = change.doc.data();
                 const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) ) {
+                if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
                     await env.services.dialog.add(AlertDialog, {
                         title: _t('Payment Successful'),

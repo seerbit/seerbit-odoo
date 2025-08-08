@@ -133,7 +133,7 @@ export default class SeerbitPayment extends PaymentInterface {
         if (this.seerbit_was_cancelled) {
             console.log('seerbit_was_cancelled', this.seerbit_was_cancelled);
             paymentLine.set_payment_status('waitingSeerbit');
-            return resolve(true);
+            return reject(); 
         }
         if (!this.pos.get_order().get_selected_paymentline()) {
             console.log('No payment line');
