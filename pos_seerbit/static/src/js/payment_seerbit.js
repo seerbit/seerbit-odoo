@@ -202,7 +202,8 @@ odoo.define('pos_seerbit.payment', function (require) {
         _poll_for_response: function (resolve, reject) {
             var self = this;
             if (this.was_cancelled || !this.pos.get_order().selected_paymentline) {
-                return resolve(true);
+                console.log('was_cancelled', this.was_cancelled);
+                return reject(); 
             }
 
             // Check localStorage for completed transaction first

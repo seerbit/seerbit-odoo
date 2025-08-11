@@ -47,7 +47,7 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
                     console.log('Reconciliation data received:', data);
 
                     const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                    if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) ) {
+                    if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
                         console.log('Matching transaction found, setting completed_transaction...');
                         
                         // Set completed transaction in localStorage for polling to detect?
