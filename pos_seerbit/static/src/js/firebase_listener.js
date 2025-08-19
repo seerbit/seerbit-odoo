@@ -23,6 +23,7 @@ function listenForReconciliation(transactionId, env) {
         return;
     }
     const reconciliationsRef = firestoreDb.collection('reconciliations');
+    
     const unsubscribe = reconciliationsRef.onSnapshot(async function(snapshot) {
         snapshot.docChanges().forEach(async function(change) {
             if (change.type === 'added') {
