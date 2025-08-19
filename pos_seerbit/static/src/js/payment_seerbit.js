@@ -100,6 +100,7 @@ export default class SeerbitPayment extends PaymentInterface {
             [[paymentLine.payment_method?.id], payload],
             {}
         ).then(() => {
+                console.log('Payment request sent successfully');
                 localStorage.setItem('pending_transaction', JSON.stringify(payload));
             FirebaseListener.listenForReconciliation(payload.id, this.pos.env);
             return this._seerbit_start_get_status_polling(paymentLine);

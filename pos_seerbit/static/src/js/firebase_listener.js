@@ -28,8 +28,11 @@ function listenForReconciliation(transactionId, env) {
             if (change.type === 'added') {
                 const data = change.doc.data();
                 const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
+                console.log('Payment reconciliation data received:', data);
+                console.log('Payment reconciliation pending:', pending);
                 if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
+                    console.log('Payment reconciliation completed successfully');
                     await env.services.dialog.add(AlertDialog, {
                         title: _t('Payment Successful'),
                         body: _t('Payment has been successfully processed.'),
