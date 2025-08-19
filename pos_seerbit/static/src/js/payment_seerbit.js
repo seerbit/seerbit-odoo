@@ -67,12 +67,12 @@ export default class SeerbitPayment extends PaymentInterface {
             const metadata = JSON.stringify({
                 'created_by': 'odoo_pos_seerbit',
                 'created_time': now.toISOString(),
-                'order_id': order.uid,
+                'order_id': order?.id || order.uid,
                 'pos_config_id': this.pos.config?.id,
                 'user_id': this.pos.user?.id
             });
         return {
-                "id": order.uid?.toString(),
+                "id": order?.id || order.uid?.toString(),
                 "posid": paymentMethod?.seerbit_terminal_id || "",
                 "merchantid": "",
                 "metadata": metadata,
@@ -182,7 +182,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
-            line.set_receipt_info('Transaction ID: ' + line.pos_order_id?.uuid?.toString());
+            line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.pos_order_id?.id)?.toString());
             clearTimeout(this.seerbit_polling);
             
             // Clean up localStorage to prevent "electronic payment in progress" error
