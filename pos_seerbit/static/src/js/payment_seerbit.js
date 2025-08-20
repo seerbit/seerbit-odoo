@@ -148,7 +148,7 @@ export default class SeerbitPayment extends PaymentInterface {
                     paymentLine.set_payment_status('done');
                     paymentLine.set_receipt_info('Transaction ID: ' + transactionData.id);
                     try{
-                    paymentLine.transaction_id = transactionData?.transactionRef || transactionData.id;
+                    paymentLine.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
                     paymentLine.card_type = 'Seerbit';
                     }catch(error){
                         // console.error('Error setting transaction ID:', error);

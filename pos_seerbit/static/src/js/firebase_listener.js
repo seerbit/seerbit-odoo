@@ -23,7 +23,7 @@ function listenForReconciliation(transactionId, env) {
         return;
     }
     const reconciliationsRef = firestoreDb.collection('reconciliations');
-    
+    let alertedUser = 0
     const unsubscribe = reconciliationsRef.onSnapshot(async function(snapshot) {
         snapshot.docChanges().forEach(async function(change) {
             if (change.type === 'added') {
@@ -34,10 +34,13 @@ function listenForReconciliation(transactionId, env) {
                 if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
                     localStorage.setItem('completed_transaction', JSON.stringify(data));
                     console.log('Payment reconciliation completed successfully');
-                    await env.services.dialog.add(AlertDialog, {
-                        title: _t('Payment Successful'),
-                        body: _t('Payment has been successfully processed.'),
-                    });
+                    if(alertedUser === 0){
+                        await env.services.dialog.add(AlertDialog, {
+                            title: _t('Payment Successful'),
+                            body: _t('Payment has been successfully processed.'),
+                        });
+                        alertedUser = 1
+                    }
                 }
             }
         });
