@@ -126,7 +126,7 @@ export default class SeerbitPayment extends PaymentInterface {
                 const transactionData = JSON.parse(completedTransaction);
                 if (paymentLine) {
                     paymentLine.set_payment_status('done');
-                    paymentLine.set_receipt_info('Transaction ID: ' + transactionData.id);
+                    paymentLine.set_receipt_info('Transaction ID: ' +  transactionData?.sessionId || transactionData?.transactionRef || transactionData.id);
                     paymentLine.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
                     paymentLine.card_type = 'Seerbit';
                     paymentLine.cardholder_name = 'Seerbit Payment';
