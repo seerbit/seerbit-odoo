@@ -146,7 +146,7 @@ export default class SeerbitPayment extends PaymentInterface {
                     const transactionData = JSON.parse(completedTransaction);
                 if (paymentLine) {
                     paymentLine.set_payment_status('done');
-                    paymentLine.set_receipt_info('Transaction ID: ' + transactionData.id);
+                    paymentLine.set_receipt_info('Transaction ID: ' + ( transactionData?.sessionId || transactionData?.transactionRef || transactionData.id));
                     try{
                     paymentLine.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
                     paymentLine.card_type = 'Seerbit';
@@ -154,14 +154,20 @@ export default class SeerbitPayment extends PaymentInterface {
                         // console.error('Error setting transaction ID:', error);
                     }
                     paymentLine.cardholder_name = 'Seerbit Payment';
-                        localStorage.removeItem('completed_transaction');
-                        localStorage.removeItem('pending_transaction');
-                        resolve(true);
-                        return;
+                    localStorage.removeItem('completed_transaction');
+                    localStorage.removeItem('pending_transaction');
+                    this.env.services.dialog.add(AlertDialog, {
+                        title: _t('Payment Successful'),
+                        body: _t('Payment has been successfully processed.'),
+                    });
+                    resolve(true);
+                    return;
                     }
                 } catch (error) {
                     console.error('Error parsing completed transaction:', error);
                     localStorage.removeItem('completed_transaction');
+                    localStorage.removeItem('pending_transaction');
+
                 if (paymentLine) {
                     paymentLine.set_payment_status('errorSeerbit');
                 }
