@@ -217,8 +217,8 @@ odoo.define('pos_seerbit.payment', function (require) {
                     if (line) {
                         // Mark payment as done
                         line.set_payment_status('done');
-                        line.set_receipt_info('Transaction ID: ' + transactionData.id);
-                        line.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
+                        line.set_receipt_info('Transaction ID: ' + (transactionData?.sessionId || transactionData?.transactionRef || transactionData?.id));
+                        line.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData?.id;
                         line.card_type = 'Seerbit';
                         line.cardholder_name = 'Seerbit Payment';
                         
