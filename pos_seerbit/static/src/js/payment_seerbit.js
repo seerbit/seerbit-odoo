@@ -127,7 +127,7 @@ export default class SeerbitPayment extends PaymentInterface {
                 if (paymentLine) {
                     paymentLine.set_payment_status('done');
                     paymentLine.set_receipt_info('Transaction ID: ' + transactionData.id);
-                    paymentLine.transaction_id = transactionData.id;
+                    paymentLine.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
                     paymentLine.card_type = 'Seerbit';
                     paymentLine.cardholder_name = 'Seerbit Payment';
                     localStorage.removeItem('completed_transaction');
