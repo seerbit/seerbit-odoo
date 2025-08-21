@@ -181,8 +181,22 @@ export default class SeerbitPayment extends PaymentInterface {
             paymentLine.card_type = 'Seerbit';
             paymentLine.cardholder_name = 'Seerbit Payment';
 
-            // Mark payment as done
+            // Mark payment as done and finalize the payment line
             paymentLine.set_payment_status('done');
+            paymentLine.set_paid();
+            
+            // Update the order state
+            const order = this.pos.get_order();
+            if (order) {
+                order.add_paymentline(paymentLine);
+                order.select_orderline(paymentLine);
+                
+                // Finalize the order if all payments are complete
+                if (order.is_paid()) {
+                    order.finalize();
+                }
+                
+            }
             
             // Clean up
             this._reset_seerbit_state();
