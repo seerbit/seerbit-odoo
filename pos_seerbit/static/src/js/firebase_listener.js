@@ -53,7 +53,7 @@ function listenForReconciliation(transactionId, env) {
                         console.log('Payment reconciliation data received:', data);
                         
                         // Validate the transaction matches our pending one
-                        if (pending && data?.id === pending?.id && data?.posid === pending?.posid && data.transactionValue === pending.transactionValue) {
+                        if (pending && data?.id === pending?.id && data?.posid === pending?.posid ) {
                             const status = String(data?.status || '').toLowerCase();
                             if (['success', 'completed', 'complete', 'done', 'successful'].includes(status)) {
                                 // Store the completed transaction
