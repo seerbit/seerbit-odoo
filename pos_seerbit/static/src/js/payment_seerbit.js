@@ -192,10 +192,14 @@ export default class SeerbitPayment extends PaymentInterface {
                 order.select_orderline(paymentLine);
                 
                 // Finalize the order if all payments are complete
-                if (order.is_paid()) {
+                if (order.is_paid) {
                     order.finalize();
+                    console.log('finalized')
+                    
                 }
-                
+                console.log('setting done again')
+                paymentLine.set_payment_status('done');
+
             }
             
             // Clean up
