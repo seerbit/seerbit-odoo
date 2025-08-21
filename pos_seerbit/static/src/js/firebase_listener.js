@@ -34,9 +34,9 @@ function listenForReconciliation(transactionId, env) {
             return;
         }
 
+        // Query without orderBy to avoid composite index requirement
         const reconciliationsRef = firestoreDb.collection('reconciliations')
             .where('id', '==', transactionId)
-            .orderBy('timestamp', 'desc')
             .limit(1);
 
         const unsubscribe = reconciliationsRef.onSnapshot(
