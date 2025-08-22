@@ -67,12 +67,12 @@ export default class SeerbitPayment extends PaymentInterface {
             const metadata = JSON.stringify({
                 'created_by': 'odoo_pos_seerbit',
                 'created_time': now.toISOString(),
-                'order_id': paymentLine.order_id?.uuid || order?.id || order.uid,
+                'order_id': order?.uuid || order?.id || order.uid,
                 'pos_config_id': this.pos.config?.id,
                 'user_id': this.pos.user?.id
             });
         return {
-                "id": paymentLine.order_id?.uuid || order?.id || order.uid?.toString(),
+                "id": order?.uuid || order?.id || order.uid,
                 "posid": paymentMethod?.seerbit_terminal_id || "",
                 "merchantid": "",
                 "metadata": metadata,
@@ -135,13 +135,13 @@ export default class SeerbitPayment extends PaymentInterface {
             console.log('Payment was cancelled by user');
             paymentLine.set_payment_status('retry');
             this._reset_seerbit_state();
-            return reject({ code: 'CANCELLED', message: 'Payment was cancelled by user' });
+            return reject();
         }
 
         const order = this.pos.get_order();
         if (!order || !order.get_selected_paymentline()) {
             console.log('No active payment line found');
-            return reject({ code: 'NO_PAYMENT_LINE', message: 'No active payment line' });
+            return reject();
         }
 
         try {
@@ -183,28 +183,7 @@ export default class SeerbitPayment extends PaymentInterface {
 
             // Mark payment as done and finalize the payment line
             paymentLine.set_payment_status('done');
-            
-            // Update the order state
-            const order = this.pos.get_order();
-            if (order) {
-                order.add_paymentline(paymentLine);
-                order.select_orderline(paymentLine);
-                
-                // Finalize the order if all payments are complete
-                if (order.is_paid) {
-                    try{
-                        order?.finalize();
-                        console.log('finalized')
-                    }catch(error){
-                        console.log('error finalizing order', error)
-                    }
-                    
-                }
-                console.log('setting done again')
-                paymentLine.set_payment_status('done');
-
-            }
-            
+           
             // Clean up
             this._reset_seerbit_state();
             
@@ -230,11 +209,7 @@ export default class SeerbitPayment extends PaymentInterface {
                 body: _t('An error occurred while processing your payment. Please try again.'),
             });
             
-            reject({
-                code: 'PROCESSING_ERROR',
-                message: 'Error processing payment response',
-                error: error
-            });
+            reject();
         }
     }
 
@@ -274,7 +249,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_force_done(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
-            line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id.uuid)?.toString());
+            line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id?.uuid)?.toString());
             clearTimeout(this.seerbit_polling);
             
             // Clean up localStorage to prevent "electronic payment in progress" error
