@@ -63,7 +63,9 @@ export default class SeerbitPayment extends PaymentInterface {
             const day = String(now.getDate()).padStart(2, '0');
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const year = now.getFullYear();
-            const receivedDateTime = `${day}/${month}/${year}`;
+            const hour = String(now.getHours()).padStart(2, '0');
+            const minute = String(now.getMinutes()).padStart(2, '0');
+            const receivedDateTime = `${day}/${month}/${year} ${hour}:${minute}`;
             const metadata = JSON.stringify({
                 'created_by': 'odoo_pos_seerbit',
                 'created_time': now.toISOString(),
@@ -94,7 +96,9 @@ export default class SeerbitPayment extends PaymentInterface {
             console.error('Error creating payment payload:', error);
             return Promise.reject(error);
         }
-       
+        if(!paymentLine.payment_method?.id){
+            return;
+        }
 
         return this.pos.env.services.orm.call(
             'pos.payment.method',
@@ -128,9 +132,10 @@ export default class SeerbitPayment extends PaymentInterface {
             self.seerbit_polling = setInterval(function () {
                 self._seerbit_poll_for_response(paymentLine, resolve, reject);
                 }, 3500);
-        }).finally(function () {
-            self._reset_seerbit_state();
-        });
+        })
+        // .finally(function () {
+        //     self._reset_seerbit_state();
+        // });
     }
 
     async _seerbit_poll_for_response(paymentLine, resolve, reject) {
@@ -175,51 +180,38 @@ export default class SeerbitPayment extends PaymentInterface {
             }
 
             // Update payment line with transaction details
-            paymentLine.set_payment_status('pending');
+            paymentLine.set_payment_status('processing');
             
             // Set transaction details
             const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
-            
-            // Clean up before marking as done to ensure clean state for receipt generation
-            this._reset_seerbit_state();
-            
-            // Mark payment as done and finalize the payment line
-            paymentLine.set_payment_status('done');
-            
-            // Set transaction details after cleanup to ensure they're included in receipt
             paymentLine.set_receipt_info('Transaction ID: ' + transactionId);
             paymentLine.transaction_id = transactionId;
             paymentLine.card_type = 'Seerbit';
             paymentLine.cardholder_name = 'Seerbit Payment';
-            
-            // Force UI update
-            try{
-                console.log('Updating payment status for payment line:', paymentLine.cid);
-            if (this.pos) {
-                const models = this.pos.proxy.models;
-                if (models.PosModel) {
-                    const posModel = models.PosModel;
-                    await posModel.rpc({
-                        model: 'pos.order',
-                        method: 'update_payment_status',
-                        args: [paymentLine.cid],
-                    });
-                    console.log('Payment status updated successfully');
-                }
-            }
-        }catch(error){
-            console.error('Error updating payment status:', error);
-        }
+
+            // Mark payment as done and finalize the payment line
+            paymentLine.set_payment_status('done');
+           
             
             // Show success message
-            // this.env.services.dialog.add(AlertDialog, {
-            //     title: _t('Payment Successful'),
-            //     body: _t('Payment has been successfully processed.'),
-            // });
-            
-            // Resolve the promise to continue the payment flow
+            this.env.services.dialog.add(AlertDialog, {
+                title: _t('Payment Successful'),
+                body: _t('Payment has been successfully processed.'),
+            });
+
+            paymentLine.set_payment_status('done');
+            this.pos.paymentTerminalInProgress = false;
+
+            // Clean local storage right here
+            localStorage.removeItem('pending_transaction');
+            localStorage.removeItem('completed_transaction');
+
+            // Cleanup state AFTER confirming payment
+            this.seerbit_polling && clearInterval(this.seerbit_polling);
+            this.seerbit_polling = null;
+            this.seerbit_was_cancelled = false;
+
             resolve(true);
-            return;
             
         } catch (error) {
             console.error('Error processing payment response:', error);
