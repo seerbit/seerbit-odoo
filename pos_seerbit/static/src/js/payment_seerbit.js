@@ -94,9 +94,7 @@ export default class SeerbitPayment extends PaymentInterface {
             console.error('Error creating payment payload:', error);
             return Promise.reject(error);
         }
-        if(!paymentLine.payment_method?.id){
-            return;
-        }
+       
 
         return this.pos.env.services.orm.call(
             'pos.payment.method',
@@ -177,7 +175,7 @@ export default class SeerbitPayment extends PaymentInterface {
             }
 
             // Update payment line with transaction details
-            paymentLine.set_payment_status('processing');
+            paymentLine.set_payment_status('pending');
             
             // Set transaction details
             const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
@@ -214,13 +212,14 @@ export default class SeerbitPayment extends PaymentInterface {
         }
             
             // Show success message
-            this.env.services.dialog.add(AlertDialog, {
-                title: _t('Payment Successful'),
-                body: _t('Payment has been successfully processed.'),
-            });
+            // this.env.services.dialog.add(AlertDialog, {
+            //     title: _t('Payment Successful'),
+            //     body: _t('Payment has been successfully processed.'),
+            // });
             
             // Resolve the promise to continue the payment flow
             resolve(true);
+            return;
             
         } catch (error) {
             console.error('Error processing payment response:', error);
