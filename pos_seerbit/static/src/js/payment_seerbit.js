@@ -87,13 +87,17 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     _send_seerbit_payment_request_to_firestore(paymentLine) {
-            let payload;
-            try {
-            payload = this._seerbit_pay_data(paymentLine);
-            } catch (error) {
-                console.error('Error creating payment payload:', error);
-                return Promise.reject(error);
-            }
+        let payload;
+        try {
+        payload = this._seerbit_pay_data(paymentLine);
+        } catch (error) {
+            console.error('Error creating payment payload:', error);
+            return Promise.reject(error);
+        }
+        if(!paymentLine.payment_method?.id){
+            return;
+        }
+
         return this.pos.env.services.orm.call(
             'pos.payment.method',
             'send_seerbit_payment_request',
@@ -115,6 +119,7 @@ export default class SeerbitPayment extends PaymentInterface {
             });
             return false;
         });
+
     }
 
     _seerbit_start_get_status_polling(paymentLine) {
@@ -176,16 +181,37 @@ export default class SeerbitPayment extends PaymentInterface {
             
             // Set transaction details
             const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
+            
+            // Clean up before marking as done to ensure clean state for receipt generation
+            this._reset_seerbit_state();
+            
+            // Mark payment as done and finalize the payment line
+            paymentLine.set_payment_status('done');
+            
+            // Set transaction details after cleanup to ensure they're included in receipt
             paymentLine.set_receipt_info('Transaction ID: ' + transactionId);
             paymentLine.transaction_id = transactionId;
             paymentLine.card_type = 'Seerbit';
             paymentLine.cardholder_name = 'Seerbit Payment';
-
-            // Mark payment as done and finalize the payment line
-            paymentLine.set_payment_status('done');
-           
-            // Clean up
-            this._reset_seerbit_state();
+            
+            // Force UI update
+            try{
+                console.log('Updating payment status for payment line:', paymentLine.cid);
+            if (this.pos) {
+                const models = this.pos.proxy.models;
+                if (models.PosModel) {
+                    const posModel = models.PosModel;
+                    await posModel.rpc({
+                        model: 'pos.order',
+                        method: 'update_payment_status',
+                        args: [paymentLine.cid],
+                    });
+                    console.log('Payment status updated successfully');
+                }
+            }
+        }catch(error){
+            console.error('Error updating payment status:', error);
+        }
             
             // Show success message
             this.env.services.dialog.add(AlertDialog, {
