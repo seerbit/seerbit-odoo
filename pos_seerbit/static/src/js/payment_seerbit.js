@@ -47,7 +47,9 @@ export default class SeerbitPayment extends PaymentInterface {
         const day = String(now.getDate()).padStart(2, '0');
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const year = now.getFullYear();
-        const receivedDateTime = `${day}/${month}/${year}`;
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const receivedDateTime = `${day}/${month}/${year} ${hour}:${minute}`;
         const metadata = JSON.stringify({
             'created_by': 'odoo_pos_seerbit',
             'created_time': now.toISOString(),
