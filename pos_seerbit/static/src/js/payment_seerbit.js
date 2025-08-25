@@ -96,14 +96,14 @@ export default class SeerbitPayment extends PaymentInterface {
             console.error('Error creating payment payload:', error);
             return Promise.reject(error);
         }
-        if(!paymentLine.payment_method?.id){
+        if(!paymentLine.payment_method_id?.id){
             return;
         }
 
         return this.pos.env.services.orm.call(
             'pos.payment.method',
             'send_seerbit_payment_request',
-            [[paymentLine.payment_method?.id], payload],
+            [[paymentLine.payment_method_id?.id], payload],
             {}
         ).then(() => {
                 console.log('Payment request sent successfully');
