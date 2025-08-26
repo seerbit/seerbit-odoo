@@ -124,7 +124,7 @@ export default class SeerbitPayment extends PaymentInterface {
         }
 
         const order = this.pos.get_order();
-        if (!order || !order.get_selected_paymentline()) {
+        if (!order || !order.selected_paymentline) {
             console.log('No active payment line found, polling will continue until cleared.');
             return;
         }
