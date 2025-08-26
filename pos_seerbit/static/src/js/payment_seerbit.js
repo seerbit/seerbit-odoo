@@ -105,7 +105,7 @@ export default class SeerbitPayment extends PaymentInterface {
     _seerbit_start_get_status_polling(paymentLine) {
         const self = this;
         return new Promise(function (resolve, reject) {
-            clearTimeout(self.seerbit_polling);
+            clearInterval(self.seerbit_polling);
             self._seerbit_poll_for_response(paymentLine, resolve, reject);
             self.seerbit_polling = setInterval(function () {
                 self._seerbit_poll_for_response(paymentLine, resolve, reject);
@@ -115,53 +115,79 @@ export default class SeerbitPayment extends PaymentInterface {
         });
     }
 
-    _seerbit_poll_for_response(paymentLine, resolve, reject) {
-        if (this.seerbit_was_cancelled || !this.pos.get_order().selected_paymentline) {
-            console.log('seerbit_was_cancelled', this.seerbit_was_cancelled);
-            paymentLine.set_payment_status('waitingSeerbit');
-            return reject(); 
-        
+    async _seerbit_poll_for_response(paymentLine, resolve, reject) {
+        if (this.seerbit_was_cancelled) {
+            console.log('Payment was cancelled by user');
+            paymentLine.set_payment_status('retry');
+            this._reset_seerbit_state();
+            return reject();
         }
+
+        const order = this.pos.get_order();
+        if (!order || !order.get_selected_paymentline()) {
+            console.log('No active payment line found, polling will continue until cleared.');
+            return;
+        }
+
         const completedTransaction = localStorage.getItem('completed_transaction');
-        if (completedTransaction) {
-            try {
-                const transactionData = JSON.parse(completedTransaction);
-                if (paymentLine) {
-                    paymentLine.set_payment_status('done');
-                    paymentLine.set_receipt_info('Transaction ID: ' + ( transactionData?.sessionId || transactionData?.transactionRef || transactionData.id));
-                    paymentLine.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
-                    paymentLine.card_type = 'Seerbit';
-                    paymentLine.cardholder_name = 'Seerbit Payment';
-                    localStorage.removeItem('completed_transaction');
-                    localStorage.removeItem('pending_transaction');
-                    resolve(true);
-                    return;
-                }
-            } catch (error) {
-                console.error('Error parsing completed transaction:', error);
+        if (!completedTransaction) {
+            // No completed transaction yet, the interval will poll again.
+            return;
+        }
+
+        try {
+            const transactionData = JSON.parse(completedTransaction);
+            const pendingTransaction = JSON.parse(localStorage.getItem('pending_transaction') || '{}');
+
+            if (pendingTransaction && pendingTransaction.id !== transactionData.id) {
+                console.warn('Transaction ID mismatch, ignoring stale transaction');
                 localStorage.removeItem('completed_transaction');
-                if (paymentLine) {
-                    paymentLine.set_payment_status('errorSeerbit');
-                }
-                this.env.services.popup.add(ConfirmPopup, {
-                    title: _t('Odoo Error'),
-                    body: _t('Error Marking payment as done'),
-                });
-                reject();
+                return; // Stale transaction found, the interval will poll again.
             }
+
+            if (paymentLine) {
+                paymentLine.set_payment_status('done');
+                const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
+                paymentLine.set_receipt_info('Transaction ID: ' + transactionId);
+                paymentLine.transaction_id = transactionId;
+                paymentLine.card_type = 'Seerbit';
+                paymentLine.cardholder_name = 'Seerbit Payment';
+                
+                this._reset_seerbit_state(); // Clear state after processing
+                resolve(true);
+            }
+        } catch (error) {
+            console.error('Error processing payment response:', error);
+            this._reset_seerbit_state();
+            if (paymentLine) {
+                paymentLine.set_payment_status('errorSeerbit');
+            }
+            this.env.services.popup.add(ConfirmPopup, {
+                title: _t('Payment Error'),
+                body: _t('An error occurred while processing your payment. Please try again.'),
+            });
+            reject();
         }
     }
 
     _reset_seerbit_state() {
+        clearInterval(this.seerbit_polling);
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
-        this.supports_reversals = false;
-        initializeSeerbitFirebase(this.pos.env.services.orm);
+        
+        // Clear any pending transactions from localStorage
+        localStorage.removeItem('pending_transaction');
+        localStorage.removeItem('completed_transaction');
+        
+        // Ensure the POS knows we're done with the payment terminal
+        if (this.pos) {
+            this.pos.paymentTerminalInProgress = false;
+        }
     }
 
     async send_payment_cancel(order, cid) {
         this.seerbit_was_cancelled = true;
-        clearTimeout(this.seerbit_polling);
+        this._reset_seerbit_state();
         return Promise.resolve();
     }
 
@@ -178,6 +204,6 @@ export default class SeerbitPayment extends PaymentInterface {
 
     close() {
         this.seerbit_was_cancelled = true;
-        clearTimeout(this.seerbit_polling);
+        this._reset_seerbit_state();
     }
 }
