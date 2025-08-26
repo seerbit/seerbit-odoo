@@ -46,11 +46,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async send_payment_cancel(order, uuid) {
 
         this.seerbit_was_cancelled = true;
-        clearTimeout(this.seerbit_polling);
-        localStorage.removeItem('pending_transaction');
-        localStorage.removeItem('completed_transaction');
         this._reset_seerbit_state();
-
         return true;
     }
 
@@ -127,15 +123,15 @@ export default class SeerbitPayment extends PaymentInterface {
     _seerbit_start_get_status_polling(paymentLine) {
         const self = this;
         return new Promise(function (resolve, reject) {
-            clearTimeout(self.seerbit_polling);
+            clearInterval(self.seerbit_polling);
             self._seerbit_poll_for_response(paymentLine, resolve, reject);
             self.seerbit_polling = setInterval(function () {
                 self._seerbit_poll_for_response(paymentLine, resolve, reject);
                 }, 3500);
         })
-        // .finally(function () {
-        //     self._reset_seerbit_state();
-        // });
+        .finally(function () {
+            self._reset_seerbit_state();
+        });
     }
 
     async _seerbit_poll_for_response(paymentLine, resolve, reject) {
@@ -148,18 +144,14 @@ export default class SeerbitPayment extends PaymentInterface {
 
         const order = this.pos.get_order();
         if (!order || !order.get_selected_paymentline()) {
-            console.log('No active payment line found');
-            return reject();
+            console.log('No active payment line found, polling will continue until cleared.');
+            return;
         }
 
         try {
             const completedTransaction = localStorage.getItem('completed_transaction');
             if (!completedTransaction) {
-                // No completed transaction yet, continue polling
-                this.seerbit_polling = setTimeout(
-                    () => this._seerbit_poll_for_response(paymentLine, resolve, reject),
-                    2000
-                );
+                // No completed transaction yet, the interval will poll again.
                 return;
             }
 
@@ -172,15 +164,14 @@ export default class SeerbitPayment extends PaymentInterface {
             if (pendingTransaction && pendingTransaction.id !== transactionData.id) {
                 console.warn('Transaction ID mismatch, ignoring stale transaction');
                 localStorage.removeItem('completed_transaction');
-                this.seerbit_polling = setTimeout(
-                    () => this._seerbit_poll_for_response(paymentLine, resolve, reject),
-                    1000
-                );
+                // Stale transaction found, the interval will poll again.
                 return;
             }
 
-            // Update payment line with transaction details
-            paymentLine.set_payment_status('processing');
+            
+            // Mark payment as done and finalize the payment line
+            paymentLine.set_payment_status('done');
+           
             
             // Set transaction details
             const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
@@ -189,27 +180,11 @@ export default class SeerbitPayment extends PaymentInterface {
             paymentLine.card_type = 'Seerbit';
             paymentLine.cardholder_name = 'Seerbit Payment';
 
-            // Mark payment as done and finalize the payment line
-            paymentLine.set_payment_status('done');
-           
-            
             // Show success message
             this.env.services.dialog.add(AlertDialog, {
                 title: _t('Payment Successful'),
                 body: _t('Payment has been successfully processed.'),
             });
-
-            paymentLine.set_payment_status('done');
-            this.pos.paymentTerminalInProgress = false;
-
-            // Clean local storage right here
-            localStorage.removeItem('pending_transaction');
-            localStorage.removeItem('completed_transaction');
-
-            // Cleanup state AFTER confirming payment
-            this.seerbit_polling && clearInterval(this.seerbit_polling);
-            this.seerbit_polling = null;
-            this.seerbit_was_cancelled = false;
 
             resolve(true);
             
@@ -231,13 +206,12 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
     _reset_seerbit_state() {
-        // Clear any pending timeouts
-        clearTimeout(this.seerbit_polling);
+        // Clear any pending intervals
+        clearInterval(this.seerbit_polling);
         
         // Reset state variables
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
-        this.supports_reversals = false;
         
         // Clear any pending transactions from localStorage
         const pending = localStorage.getItem('pending_transaction');
@@ -249,12 +223,8 @@ export default class SeerbitPayment extends PaymentInterface {
                 console.warn('Error parsing pending transaction:', e);
             }
         }
-        
         localStorage.removeItem('pending_transaction');
         localStorage.removeItem('completed_transaction');
-        
-        // Reinitialize Firebase for the next transaction
-        initializeSeerbitFirebase(this.pos.env.services.orm);
         
         // Ensure the POS knows we're done with the payment terminal
         if (this.pos) {
@@ -267,11 +237,7 @@ export default class SeerbitPayment extends PaymentInterface {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
             line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id?.uuid)?.toString());
-            clearTimeout(this.seerbit_polling);
-            
-            // Clean up localStorage to prevent "electronic payment in progress" error
-            localStorage.removeItem('pending_transaction');
-            localStorage.removeItem('completed_transaction');
+            this._reset_seerbit_state();
             
             await this.env.services.dialog.add(AlertDialog, {
                 title: 'Seerbit Payment',
@@ -285,10 +251,6 @@ export default class SeerbitPayment extends PaymentInterface {
 
     close() {
         this.seerbit_was_cancelled = true;
-        clearTimeout(this.seerbit_polling);
-        
-        // Clean up localStorage when closing to prevent stale state
-        localStorage.removeItem('pending_transaction');
-        localStorage.removeItem('completed_transaction');
+        this._reset_seerbit_state();
     }
 }
