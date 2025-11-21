@@ -6,6 +6,7 @@ import random
 import string
 import warnings
 import sys
+import requests
 
 # Set up logging first
 _logger = logging.getLogger(__name__)
