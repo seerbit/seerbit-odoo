@@ -124,7 +124,7 @@ except Exception as e:
 #       FALLBACK METHOD FOR API SEND
 # -------------------------------------------------------    
 
-def _send_to_fallback(self, payload):
+def _send_to_fallback(env, payload):
     """
     POST JSON payload to fallback endpoint when Firestore is unavailable.
     """
@@ -154,6 +154,22 @@ def send_to_firestore_transactions(env, payload):
     Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
     If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
     """
+    
+    # Ensure all values are stringified and add server timestamp
+    firestore_payload = {
+        'id': str(payload.get('id', '')),
+        'posid': str(payload.get('posid', '')),
+        'merchantid': str(payload.get('merchantid', "")),
+        'metadata': str(payload.get('metadata', '')),
+        'transactionValue': str(payload.get('transactionValue', '')),
+        'status': str(payload.get('status', '')),
+        'transactionTime': str(payload.get('transactionTime', '')),
+        'sessionId': str(payload.get('sessionId', '')),
+        'receivedDateTime': str(payload.get('receivedDateTime', '')),
+        'transactionRef': str(payload.get('transactionRef', '')),
+        'pubkey': str(payload.get('pubkey', '')),
+    }
+    
     # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
     if FIRESTORE_AVAILABLE:
         try:
@@ -162,21 +178,6 @@ def send_to_firestore_transactions(env, payload):
             
             # Get Firestore client
             db = firestore.client()
-            
-            # Ensure all values are stringified and add server timestamp
-            firestore_payload = {
-                'id': str(payload.get('id', '')),
-                'posid': str(payload.get('posid', '')),
-                'merchantid': str(payload.get('merchantid', "")),
-                'metadata': str(payload.get('metadata', '')),
-                'transactionValue': str(payload.get('transactionValue', '')),
-                'status': str(payload.get('status', '')),
-                'transactionTime': str(payload.get('transactionTime', '')),
-                'sessionId': str(payload.get('sessionId', '')),
-                'receivedDateTime': str(payload.get('receivedDateTime', '')),
-                'transactionRef': str(payload.get('transactionRef', '')),
-                'pubkey': str(payload.get('pubkey', '')),
-            }
             
             # Add to transactions collection
             doc_ref = db.collection('transactions').document()
