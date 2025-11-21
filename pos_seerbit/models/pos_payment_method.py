@@ -192,7 +192,7 @@ def send_to_firestore_transactions(env, payload):
     # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
     else:
         _logger.warning("Firestore SDK not available. Using fallback endpoint...")
-        return self._send_to_fallback(firestore_payload)
+        return _send_to_fallback(env, firestore_payload)
 
 
 class PosPaymentMethod(models.Model):
