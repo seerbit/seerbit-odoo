@@ -10,6 +10,8 @@ import sys
 # Set up logging first
 _logger = logging.getLogger(__name__)
 
+FALLBACK_ENDPOINT = "https://posnotification.seerbitapi.com/"
+
 # Suppress all warnings from firebase_admin before importing
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -117,51 +119,78 @@ except Exception as e:
     _logger.debug("Firestore initialization deferred: %s", str(e))
 
 
+# -------------------------------------------------------
+#       FALLBACK METHOD FOR API SEND
+# -------------------------------------------------------    
+
+def _send_to_fallback(self, payload):
+    """
+    POST JSON payload to fallback endpoint when Firestore is unavailable.
+    """
+
+    try:
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(FALLBACK_ENDPOINT, json=payload, headers=headers, timeout=30)
+
+        if response.status_code in (200, 201):
+            _logger.info("Payload sent to fallback endpoint successfully: %s", payload)
+            return True
+
+        else:
+            _logger.error(
+                "Fallback endpoint returned error %s: %s",
+                response.status_code, response.text
+            )
+            return False
+
+    except Exception as e:
+        _logger.error("Failed to send to fallback endpoint: %s", str(e))
+        return False
+
+
 def send_to_firestore_transactions(env, payload):
     """
-    Send payment request to Firestore.
+    Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
+    If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
     """
-    # Check if Firestore is available
-    if not FIRESTORE_AVAILABLE:
-        _logger.warning("Firebase Admin SDK not available. Cannot send payment request.")
-        return False
-    
-    if not initialize_firestore(env):
-        _logger.warning("Firestore not initialized. Cannot send payment request.")
-        return False
-    
-    try:
-        _logger.info('Sending payment request to Firestore: %s',
-                     pprint.pformat(payload))
-        
-        # Get Firestore client
-        db = firestore.client()
-        
-        # Ensure all values are stringified and add server timestamp
-        firestore_payload = {
-            'id': str(payload.get('id', '')),
-            'posid': str(payload.get('posid', '')),
-            'merchantid': str(payload.get('merchantid', "")),
-            'metadata': str(payload.get('metadata', '')),
-            'transactionValue': str(payload.get('transactionValue', '')),
-            'status': str(payload.get('status', '')),
-            'transactionTime': str(payload.get('transactionTime', '')),
-            'sessionId': str(payload.get('sessionId', '')),
-            'receivedDateTime': str(payload.get('receivedDateTime', '')),
-            'transactionRef': str(payload.get('transactionRef', '')),
-            'pubkey': str(payload.get('pubkey', '')),
-        }
-        
-        # Add to transactions collection
-        doc_ref = db.collection('transactions').document()
-        doc_ref.set(firestore_payload)
-        
-        _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
-        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))
-        return True
-    except Exception as e:
-        _logger.error("Failed to send payment request to Firestore: %s", str(e))
-        return False
+    # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
+    if FIRESTORE_AVAILABLE:
+        try:
+            _logger.info('Sending payment request to Firestore: %s',
+                         pprint.pformat(payload))
+            
+            # Get Firestore client
+            db = firestore.client()
+            
+            # Ensure all values are stringified and add server timestamp
+            firestore_payload = {
+                'id': str(payload.get('id', '')),
+                'posid': str(payload.get('posid', '')),
+                'merchantid': str(payload.get('merchantid', "")),
+                'metadata': str(payload.get('metadata', '')),
+                'transactionValue': str(payload.get('transactionValue', '')),
+                'status': str(payload.get('status', '')),
+                'transactionTime': str(payload.get('transactionTime', '')),
+                'sessionId': str(payload.get('sessionId', '')),
+                'receivedDateTime': str(payload.get('receivedDateTime', '')),
+                'transactionRef': str(payload.get('transactionRef', '')),
+                'pubkey': str(payload.get('pubkey', '')),
+            }
+            
+            # Add to transactions collection
+            doc_ref = db.collection('transactions').document()
+            doc_ref.set(firestore_payload)
+            
+            _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
+            _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))
+            return True
+        except Exception as e:
+            _logger.error("Failed to send payment request to Firestore: %s", str(e))
+            return False
+    # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
+    else:
+        _logger.warning("Firestore SDK not available. Using fallback endpoint...")
+        return self._send_to_fallback(firestore_payload)
 
 
 class PosPaymentMethod(models.Model):
