@@ -173,7 +173,7 @@ class PosPaymentMethod(models.Model):
     )
     seerbit_latest_response = fields.Char(
         copy=False, 
-        groups="base.group_erp_manager"
+        groups="base.group_erp_manager,point_of_sale.group_pos_user"     
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
     def _get_payment_terminal_selection(self):
