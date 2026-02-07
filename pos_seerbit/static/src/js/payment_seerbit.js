@@ -31,17 +31,27 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         send_payment_request: function (cid) {
+            console.log('[Seerbit] send_payment_request called', { cid: cid });
             this._super.apply(this, arguments);
             this._reset_state();
             return this._seerbit_pay(cid);
         },
         send_payment_cancel: function (order, cid) {
+            console.log('[Seerbit] send_payment_cancel called', { order: order?.name, cid: cid });
             this._super.apply(this, arguments);
             return this._seerbit_cancel();
         },
         close: function () {
+            var hadPending = !!this.pending_seerbit_line();
+            console.log('[Seerbit] close() called', { hadPending: hadPending, stack: new Error().stack });
             this._seerbit_cancel();
-            this._super.apply(this, arguments);
+            // When payment completed, pending_seerbit_line is null; skip parent close to avoid
+            // parent overwriting line with "Transaction Canceled" (parent may set retry when was_cancelled)
+            if (hadPending) {
+                this._super.apply(this, arguments);
+            } else {
+                console.log('[Seerbit] skipping _super.close() - payment already completed');
+            }
         },
 
         pending_seerbit_line() {
@@ -81,17 +91,25 @@ odoo.define('pos_seerbit.payment', function (require) {
             line.card_type = 'Seerbit';
             line.cardholder_name = 'Seerbit Payment';
 
-            console.log('Seerbit payment completed', {
+            var statusAfter = line.get_payment_status ? line.get_payment_status() : line.payment_status;
+            var isDoneAfter = line.is_done ? line.is_done() : (statusAfter === 'done');
+            console.log('[Seerbit] _markPaymentSuccessful: set done', {
                 orderId: orderId,
                 posid: posid,
                 amount: lineAmount,
                 transactionId: line.transaction_id,
+                statusAfter: statusAfter,
+                isDoneAfter: isDoneAfter,
+                lineCid: line.cid,
             });
 
-            Gui.showPopup('ConfirmPopup', {
-                title: _t('Payment Successful'),
-                body: _t('Payment has been successfully processed.'),
-            });
+            // Defer popup so status propagates before POS may close/update UI (reactivity fix)
+            setTimeout(function () {
+                Gui.showPopup('ConfirmPopup', {
+                    title: _t('Payment Successful'),
+                    body: _t('Payment has been successfully processed.'),
+                });
+            }, 0);
             return true;
         },
 
@@ -187,10 +205,20 @@ odoo.define('pos_seerbit.payment', function (require) {
                         self._reconciliationReject = rejectOnce;
                     },
                 }).then(function (data) {
+                    console.log('[Seerbit] reconciliation received, about to _markPaymentSuccessful');
                     var line = self.pending_seerbit_line();
-                    if (!line) return Promise.reject(new Error('No pending payment line'));
+                    if (!line) {
+                        console.warn('[Seerbit] no pending line in success .then', {
+                            paymentlines: self.pos.get_order().paymentlines.map(function (pl) {
+                                return { cid: pl.cid, status: pl.get_payment_status ? pl.get_payment_status() : pl.payment_status, isDone: pl.is_done ? pl.is_done() : null };
+                            }),
+                        });
+                        return Promise.reject(new Error('No pending payment line'));
+                    }
                     self._markPaymentSuccessful(line, data, payload.id, payload.posid);
+                    console.log('[Seerbit] _markPaymentSuccessful returned, promise will resolve');
                 }).catch(function (err) {
+                    console.log('[Seerbit] waitForReconciliation catch', { message: err?.message, err: err });
                     var line = self.pending_seerbit_line();
                     // Cancellation: just propagate, no popup
                     if (err && err.message === 'cancelled') {
@@ -224,6 +252,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                     self._show_error(msg, _t('Seerbit'));
                     return Promise.reject(err);
                 }).finally(function () {
+                    console.log('[Seerbit] waitForReconciliation finally, _reset_state');
                     self._reset_state();
                 });
             }).catch(function (error) {
@@ -237,11 +266,14 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _seerbit_cancel: function () {
-            console.log('Cancelling Seerbit payment');
             var line = this.pending_seerbit_line();
+            console.log('[Seerbit] _seerbit_cancel called', {
+                hasPendingLine: !!line,
+                pendingLineStatus: line ? (line.get_payment_status ? line.get_payment_status() : line.payment_status) : null,
+                was_cancelled: this.was_cancelled,
+            });
             if (!line) {
-                console.log('No pending Seerbit line – payment already completed; skip cancel so parent close()');
-                // No pending Seerbit line – payment already completed; skip cancel so parent close()
+                console.log('[Seerbit] no pending line, skipping cancel');
                 return;
             }
             this.was_cancelled = true;
@@ -253,7 +285,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 this._reconciliationReject(new Error('cancelled'));
                 this._reconciliationReject = null;
             }
-            
+            console.log('[Seerbit] cancel applied, was_cancelled=true');
         },
 
         _show_error: function (msg, title) {

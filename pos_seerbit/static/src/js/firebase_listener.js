@@ -68,6 +68,7 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
             unsubscribe = query.onSnapshot(
                 function (snapshot) {
                     if (cancelRef.cancelled) {
+                        console.log('[Seerbit] reconciliation listener cancelled');
                         finish(new Error('cancelled'));
                         return;
                     }

@@ -19,6 +19,7 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
             const line = order.paymentlines.find(
                 (pl) => pl.payment_method.use_payment_terminal === 'seerbit' && !pl.is_done()
             );
+            console.log('[Seerbit PaymentScreen] _resubscribeSeerbitListenerIfPending', { hasOrder: !!order, hasPendingLine: !!line, orderUid: order?.uid });
             if (!line || !line.payment_method.seerbit_terminal_id) return;
 
             const orderId = String(order.uid || '');
@@ -43,7 +44,7 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                     if (!l || l !== line || !terminal || !terminal._markPaymentSuccessful) return;
                     terminal._markPaymentSuccessful(l, data, orderId, posid);
                 })
-                
+
                 .catch((err) => {
                     if (err && err.message === 'cancelled') return;
                     if (err && err.message === 'Reconciliation timeout') return;
