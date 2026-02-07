@@ -168,6 +168,13 @@ odoo.define('pos_seerbit.payment', function (require) {
                     line.card_type = 'Seerbit';
                     line.cardholder_name = 'Seerbit Payment';
 
+                    console.log('Seerbit payment completed', {
+                        orderId: payload.id,
+                        posid: payload.posid,
+                        amount: lineAmount,
+                        transactionId: line.transaction_id,
+                    });
+
                     Gui.showPopup('ConfirmPopup', {
                         title: _t('Payment Successful'),
                         body: _t('Payment has been successfully processed.'),
