@@ -32,22 +32,14 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         send_payment_request: function (cid) {
             console.log('[Seerbit] send_payment_request called', { cid: cid });
-            if (this._reconciliationUnsubscribe) {
-                this._reconciliationUnsubscribe();
-                if (this._reconciliationReject) this._reconciliationReject(new Error('cancelled'));
-            }
-            this._reset_state();
             this._super.apply(this, arguments);
+            this._reset_state();
             return this._seerbit_pay(cid);
         },
         send_payment_cancel: function (order, cid) {
             console.log('[Seerbit] send_payment_cancel called', { order: order?.name, cid: cid });
             this._super.apply(this, arguments);
             return this._seerbit_cancel();
-        },
-        send_force_done: function (cid) {
-            this._reset_state();
-            return this._super.apply(this, arguments);
         },
         close: function () {
             var hadPending = !!this.pending_seerbit_line();
@@ -145,6 +137,9 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _reset_state: function () {
             this.was_cancelled = false;
+            if (this._reconciliationUnsubscribe) {
+                this._reconciliationUnsubscribe();
+            }
             this._reconciliationUnsubscribe = null;
             this._reconciliationReject = null;
         },
@@ -228,16 +223,14 @@ odoo.define('pos_seerbit.payment', function (require) {
                 method: 'send_seerbit_payment_request',
                 args: [[order.selected_paymentline?.payment_method?.id], payload],
             }).then(function () {
-                // Unsubscribe any existing listener before starting new one; reject its Promise so it doesn't time out later
+                // Unsubscribe any existing listener before starting new one
                 if (self._reconciliationUnsubscribe) {
                     self._reconciliationUnsubscribe();
-                    if (self._reconciliationReject) self._reconciliationReject(new Error('cancelled'));
                     self._reconciliationUnsubscribe = null;
                     self._reconciliationReject = null;
                 }
                 return new Promise(function (resolve, reject) {
                     FirebaseListener.waitForReconciliationByOrderId(payload.id, payload.posid, {
-                        timeoutMs: 1200000,
                         onReady: function (unsubscribe, rejectOnce) {
                             self._reconciliationUnsubscribe = unsubscribe;
                             self._reconciliationReject = rejectOnce;
@@ -264,39 +257,6 @@ odoo.define('pos_seerbit.payment', function (require) {
                             reject(err);
                             return;
                         }
-                        if (err && err.message === 'Reconciliation timeout') {
-                            var timeoutLine = self.pending_seerbit_line();
-                            if (!timeoutLine) {
-                                // reject(new Error('No pending payment line'));
-                                console.log('No timeout line')
-                                return;
-                            }
-                            timeoutLine.set_payment_status('waitingSeerbit');
-                            Gui.showPopup('ConfirmPopup', {
-                                title: _t('Seerbit Timeout'),
-                                body: _t('No confirmation was received from Seerbit within the expected time.\n\nYou can retry the payment request, or confirm manually if you have independently verified that the customer has paid.'),
-                                confirmText: _t('Retry'),
-                                cancelText: _t('Confirm Manually'),
-                                confirm: function () {
-                                    var l = self.pending_seerbit_line();
-                                    if (!l) {
-                                        reject(new Error('No pending payment line'));
-                                        return;
-                                    }
-                                    self.send_payment_request(l.cid).then(resolve).catch(reject);
-                                },
-                                cancel: function () {
-                                    var l = self.pending_seerbit_line();
-                                    if (!l) {
-                                        reject(new Error('No pending payment line'));
-                                        return;
-                                    }
-                                    self.send_force_done(l.cid);
-                                    resolve(true);
-                                },
-                            });
-                            return;
-                        }
                         if (line) line.set_payment_status('errorSeerbit');
                         self._show_error((err && err.message) || _t('Payment could not be confirmed.'), _t('Seerbit'));
                         reject(err);
@@ -305,9 +265,6 @@ odoo.define('pos_seerbit.payment', function (require) {
                     });
                 });
             }).catch(function (error) {
-                if (error && error.message === 'cancelled') {
-                    return Promise.resolve();
-                }
                 console.log('[Seerbit] _send_payment_request_to_firestore error', { error: error });
                 var line = order.paymentlines.find(function (pl) { return pl.cid === cid; });
                 if (line && line.set_payment_status) {

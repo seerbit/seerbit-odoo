@@ -16,12 +16,11 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
      *
      * @param {string} orderId - Order/transaction id (order.uid)
      * @param {string} posid - Terminal id (payload.posid)
-     * @param {Object} options - { timeoutMs, onReady(unsubscribe, rejectOnce), cancelRef }
+     * @param {Object} options - { onReady(unsubscribe, rejectOnce), cancelRef }
      * @returns {Promise<Object>} - Resolves with reconciliation doc data, or rejects
      */
     function waitForReconciliationByOrderId(orderId, posid, options) {
         options = options || {};
-        var timeoutMs = options.timeoutMs !== undefined ? options.timeoutMs : 1200000;
         var onReady = options.onReady || function () {};
         var cancelRef = options.cancelRef || { cancelled: false };
 
@@ -44,7 +43,6 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
             function finish(err, data) {
                 if (settled) return;
                 settled = true;
-                clearTimeout(timeoutId);
                 if (unsubscribe) unsubscribe();
                 if (err) reject(err);
                 else resolve(data);
@@ -53,14 +51,9 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
             function rejectOnce(err) {
                 if (settled) return;
                 settled = true;
-                clearTimeout(timeoutId);
                 if (unsubscribe) unsubscribe();
                 reject(err);
             }
-
-            var timeoutId = setTimeout(function () {
-                finish(new Error('Reconciliation timeout'));
-            }, timeoutMs);
 
             // Listen for new documents in reconciliations collection (like old impl, no filtered query)
             var reconciliationsRef = firestoreDb.collection('reconciliations');
