@@ -32,8 +32,12 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         send_payment_request: function (cid) {
             console.log('[Seerbit] send_payment_request called', { cid: cid });
-            this._super.apply(this, arguments);
+            if (this._reconciliationUnsubscribe) {
+                this._reconciliationUnsubscribe();
+                if (this._reconciliationReject) this._reconciliationReject(new Error('cancelled'));
+            }
             this._reset_state();
+            this._super.apply(this, arguments);
             return this._seerbit_pay(cid);
         },
         send_payment_cancel: function (order, cid) {
@@ -141,12 +145,6 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _reset_state: function () {
             this.was_cancelled = false;
-            if (this._reconciliationUnsubscribe) {
-                this._reconciliationUnsubscribe();
-            }
-            if (this._reconciliationReject) {
-                this._reconciliationReject(new Error('cancelled')); 
-            }
             this._reconciliationUnsubscribe = null;
             this._reconciliationReject = null;
         },
