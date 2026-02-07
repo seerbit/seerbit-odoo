@@ -68,6 +68,7 @@ odoo.define('pos_seerbit.payment', function (require) {
          * @returns {boolean} true on success
          */
         _markPaymentSuccessful: function (line, data, orderId, posid) {
+            console.log('[Seerbit] _markPaymentSuccessful called', { data:data, orderId:orderId, posid:posid });
             var docId = String(data?.id || '');
             var docPosid = String(data?.posid || '');
             var meta = {};
@@ -78,10 +79,31 @@ odoo.define('pos_seerbit.payment', function (require) {
             }
             var docAmount = parseFloat(meta && meta.odoo_amount ? meta.odoo_amount : 0);
             var lineAmount = parseFloat(line.amount || 0);
+
             if (docId !== String(orderId) || docPosid !== String(posid)) {
+                console.error('[Seerbit] _markPaymentSuccessful: id/posid mismatch', {
+                    expectedOrderId: orderId,
+                    expectedPosid: posid,
+                    docId: docId,
+                    docPosid: docPosid,
+                    lineCid: line?.cid,
+                    lineAmount: lineAmount,
+                });
                 throw new Error('Reconciliation doc does not match order');
             }
             if (Math.abs(docAmount - lineAmount) > 0.01) {
+                console.error('[Seerbit] _markPaymentSuccessful: amount mismatch', {
+                    expectedOrderId: orderId,
+                    expectedPosid: posid,
+                    lineAmount: lineAmount,
+                    docAmount: docAmount,
+                    diff: Math.abs(docAmount - lineAmount),
+                    metaOdooAmount: meta?.odoo_amount,
+                    metadataRaw: typeof data?.metadata === 'string' ? data.metadata : JSON.stringify(data?.metadata),
+                    lineCid: line?.cid,
+                    transactionValue: data?.transactionValue,
+                    caller: new Error().stack,
+                });
                 throw new Error('Reconciliation amount does not match order line');
             }
 
@@ -115,6 +137,9 @@ odoo.define('pos_seerbit.payment', function (require) {
 
         _reset_state: function () {
             this.was_cancelled = false;
+            if (this._reconciliationUnsubscribe) {
+                this._reconciliationUnsubscribe();
+            }
             this._reconciliationUnsubscribe = null;
             this._reconciliationReject = null;
         },
@@ -198,6 +223,12 @@ odoo.define('pos_seerbit.payment', function (require) {
                 method: 'send_seerbit_payment_request',
                 args: [[order.selected_paymentline?.payment_method?.id], payload],
             }).then(function () {
+                // Unsubscribe any existing listener before starting new one
+                if (self._reconciliationUnsubscribe) {
+                    self._reconciliationUnsubscribe();
+                    self._reconciliationUnsubscribe = null;
+                    self._reconciliationReject = null;
+                }
                 return new Promise(function (resolve, reject) {
                     FirebaseListener.waitForReconciliationByOrderId(payload.id, payload.posid, {
                         timeoutMs: 1200000,
@@ -207,6 +238,14 @@ odoo.define('pos_seerbit.payment', function (require) {
                         },
                     }).then(function (data) {
                         var line = self.pending_seerbit_line();
+                        console.log('[Seerbit] reconciliation .then received', {
+                            orderId: payload.id,
+                            data:data,
+                            posid: payload.posid,
+                            hasLine: !!line,
+                            lineAmount: line ? line.amount : null,
+                            lineCid: line ? line.cid : null,
+                        });
                         if (!line) {
                             reject(new Error('No pending payment line'));
                             return;
@@ -243,6 +282,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                     });
                 });
             }).catch(function (error) {
+                console.log('[Seerbit] _send_payment_request_to_firestore error', { error: error });
                 var line = order.paymentlines.find(function (pl) { return pl.cid === cid; });
                 if (line && line.set_payment_status) {
                     line.set_payment_status('waitingSeerbit');
