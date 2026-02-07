@@ -28,9 +28,10 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
             const terminal = line.payment_method.payment_terminal;
 
-            // Unsubscribe any existing listener (e.g. from main flow) to avoid duplicate handlers
+            // Unsubscribe any existing listener (e.g. from main flow); reject its Promise so it doesn't time out later
             if (terminal && terminal._reconciliationUnsubscribe) {
                 terminal._reconciliationUnsubscribe();
+                if (terminal._reconciliationReject) terminal._reconciliationReject(new Error('cancelled'));
                 terminal._reconciliationUnsubscribe = null;
                 terminal._reconciliationReject = null;
             }

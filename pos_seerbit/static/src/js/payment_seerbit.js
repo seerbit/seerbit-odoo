@@ -41,6 +41,10 @@ odoo.define('pos_seerbit.payment', function (require) {
             this._super.apply(this, arguments);
             return this._seerbit_cancel();
         },
+        send_force_done: function (cid) {
+            this._reset_state();
+            return this._super.apply(this, arguments);
+        },
         close: function () {
             var hadPending = !!this.pending_seerbit_line();
             console.log('[Seerbit] close() called', { hadPending: hadPending, stack: new Error().stack });
@@ -140,6 +144,9 @@ odoo.define('pos_seerbit.payment', function (require) {
             if (this._reconciliationUnsubscribe) {
                 this._reconciliationUnsubscribe();
             }
+            if (this._reconciliationReject) {
+                this._reconciliationReject(new Error('cancelled'));
+            }
             this._reconciliationUnsubscribe = null;
             this._reconciliationReject = null;
         },
@@ -223,9 +230,10 @@ odoo.define('pos_seerbit.payment', function (require) {
                 method: 'send_seerbit_payment_request',
                 args: [[order.selected_paymentline?.payment_method?.id], payload],
             }).then(function () {
-                // Unsubscribe any existing listener before starting new one
+                // Unsubscribe any existing listener before starting new one; reject its Promise so it doesn't time out later
                 if (self._reconciliationUnsubscribe) {
                     self._reconciliationUnsubscribe();
+                    if (self._reconciliationReject) self._reconciliationReject(new Error('cancelled'));
                     self._reconciliationUnsubscribe = null;
                     self._reconciliationReject = null;
                 }
@@ -259,16 +267,33 @@ odoo.define('pos_seerbit.payment', function (require) {
                             return;
                         }
                         if (err && err.message === 'Reconciliation timeout') {
-                            if (line) line.set_payment_status('waitingSeerbit');
+                            var timeoutLine = self.pending_seerbit_line();
+                            if (!timeoutLine) {
+                                // reject(new Error('No pending payment line'));
+                                console.log('No timeout line')
+                                return;
+                            }
+                            timeoutLine.set_payment_status('waitingSeerbit');
                             Gui.showPopup('ConfirmPopup', {
                                 title: _t('Seerbit Timeout'),
                                 body: _t('No confirmation was received from Seerbit within the expected time.\n\nYou can retry the payment request, or confirm manually if you have independently verified that the customer has paid.'),
                                 confirmText: _t('Retry'),
                                 cancelText: _t('Confirm Manually'),
                                 confirm: function () {
-                                    self._seerbit_pay(line.cid).then(resolve).catch(reject);
+                                    var l = self.pending_seerbit_line();
+                                    if (!l) {
+                                        reject(new Error('No pending payment line'));
+                                        return;
+                                    }
+                                    self.send_payment_request(l.cid).then(resolve).catch(reject);
                                 },
                                 cancel: function () {
+                                    var l = self.pending_seerbit_line();
+                                    if (!l) {
+                                        reject(new Error('No pending payment line'));
+                                        return;
+                                    }
+                                    self.send_force_done(l.cid);
                                     resolve(true);
                                 },
                             });
