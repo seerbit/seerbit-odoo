@@ -183,8 +183,7 @@ class PosPaymentMethod(models.Model):
     )
     seerbit_latest_response = fields.Char(
         copy=False, 
-        groups="base.group_erp_manager"
-    )  # used to buffer the latest asynchronous notification from Seerbit.
+        groups="base.group_erp_manager,point_of_sale.group_pos_user"     )  # used to buffer the latest asynchronous notification from Seerbit.
     
     @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
