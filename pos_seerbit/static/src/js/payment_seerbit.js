@@ -49,6 +49,52 @@ odoo.define('pos_seerbit.payment', function (require) {
                 paymentLine => paymentLine.payment_method.use_payment_terminal === 'seerbit' && (!paymentLine.is_done()));
         },
 
+        /**
+         * Verify reconciliation doc and mark payment line as done. Reusable by main flow and reconnect flow.
+         * @param {Object} line - Payment line
+         * @param {Object} data - Reconciliation doc data
+         * @param {string} orderId - Expected order id (payload.id)
+         * @param {string} posid - Expected posid (payload.posid)
+         * @returns {boolean} true on success
+         */
+        _markPaymentSuccessful: function (line, data, orderId, posid) {
+            var docId = String(data?.id || '');
+            var docPosid = String(data?.posid || '');
+            var meta = {};
+            try {
+                meta = data && data.metadata ? JSON.parse(data.metadata) : {};
+            } catch (e) {
+                meta = {};
+            }
+            var docAmount = parseFloat(meta && meta.odoo_amount ? meta.odoo_amount : 0);
+            var lineAmount = parseFloat(line.amount || 0);
+            if (docId !== String(orderId) || docPosid !== String(posid)) {
+                throw new Error('Reconciliation doc does not match order');
+            }
+            if (Math.abs(docAmount - lineAmount) > 0.01) {
+                throw new Error('Reconciliation amount does not match order line');
+            }
+
+            line.set_payment_status('done');
+            line.set_receipt_info('Transaction ID: ' + (data?.sessionId || data?.transactionRef || data?.id || ''));
+            line.transaction_id = data?.sessionId || data?.transactionRef || data?.id || '';
+            line.card_type = 'Seerbit';
+            line.cardholder_name = 'Seerbit Payment';
+
+            console.log('Seerbit payment completed', {
+                orderId: orderId,
+                posid: posid,
+                amount: lineAmount,
+                transactionId: line.transaction_id,
+            });
+
+            Gui.showPopup('ConfirmPopup', {
+                title: _t('Payment Successful'),
+                body: _t('Payment has been successfully processed.'),
+            });
+            return true;
+        },
+
         _reset_state: function () {
             this.was_cancelled = false;
             this._reconciliationUnsubscribe = null;
@@ -143,42 +189,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 }).then(function (data) {
                     var line = self.pending_seerbit_line();
                     if (!line) return Promise.reject(new Error('No pending payment line'));
-
-                    // Verify reconciliation doc matches order line (id, posid, amount via metadata)
-                    var docId = String(data?.id || '');
-                    var docPosid = String(data?.posid || '');
-                    var meta = {};
-                    try {
-                        meta = data && data.metadata ? JSON.parse(data.metadata) : {};
-                    } catch (e) {
-                        meta = {};
-                    }
-                    var docAmount = parseFloat(meta && meta.odoo_amount ? meta.odoo_amount : 0);
-                    var lineAmount = parseFloat(line.amount || 0);
-                    if (docId !== String(payload.id) || docPosid !== String(payload.posid)) {
-                        return Promise.reject(new Error('Reconciliation doc does not match order'));
-                    }
-                    if (Math.abs(docAmount - lineAmount) > 0.01) {
-                        return Promise.reject(new Error('Reconciliation amount does not match order line'));
-                    }
-
-                    line.set_payment_status('done');
-                    line.set_receipt_info('Transaction ID: ' + (data?.sessionId || data?.transactionRef || data?.id || ''));
-                    line.transaction_id = data?.sessionId || data?.transactionRef || data?.id || '';
-                    line.card_type = 'Seerbit';
-                    line.cardholder_name = 'Seerbit Payment';
-
-                    console.log('Seerbit payment completed', {
-                        orderId: payload.id,
-                        posid: payload.posid,
-                        amount: lineAmount,
-                        transactionId: line.transaction_id,
-                    });
-
-                    Gui.showPopup('ConfirmPopup', {
-                        title: _t('Payment Successful'),
-                        body: _t('Payment has been successfully processed.'),
-                    });
+                    self._markPaymentSuccessful(line, data, payload.id, payload.posid);
                 }).catch(function (err) {
                     var line = self.pending_seerbit_line();
                     // Cancellation: just propagate, no popup
@@ -226,6 +237,13 @@ odoo.define('pos_seerbit.payment', function (require) {
         },
 
         _seerbit_cancel: function () {
+            console.log('Cancelling Seerbit payment');
+            var line = this.pending_seerbit_line();
+            if (!line) {
+                console.log('No pending Seerbit line – payment already completed; skip cancel so parent close()');
+                // No pending Seerbit line – payment already completed; skip cancel so parent close()
+                return;
+            }
             this.was_cancelled = true;
             if (this._reconciliationUnsubscribe) {
                 this._reconciliationUnsubscribe();
@@ -235,6 +253,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 this._reconciliationReject(new Error('cancelled'));
                 this._reconciliationReject = null;
             }
+            
         },
 
         _show_error: function (msg, title) {
