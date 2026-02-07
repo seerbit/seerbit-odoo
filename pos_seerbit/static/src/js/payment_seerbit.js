@@ -253,7 +253,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 this._reconciliationReject(new Error('cancelled'));
                 this._reconciliationReject = null;
             }
-            line.set_payment_status('cancelled');
+            
         },
 
         _show_error: function (msg, title) {
