@@ -145,7 +145,7 @@ odoo.define('pos_seerbit.payment', function (require) {
                 this._reconciliationUnsubscribe();
             }
             if (this._reconciliationReject) {
-                this._reconciliationReject(new Error('cancelled'));
+                this._reconciliationReject(new Error('cancelled')); 
             }
             this._reconciliationUnsubscribe = null;
             this._reconciliationReject = null;
@@ -307,6 +307,9 @@ odoo.define('pos_seerbit.payment', function (require) {
                     });
                 });
             }).catch(function (error) {
+                if (error && error.message === 'cancelled') {
+                    return Promise.resolve();
+                }
                 console.log('[Seerbit] _send_payment_request_to_firestore error', { error: error });
                 var line = order.paymentlines.find(function (pl) { return pl.cid === cid; });
                 if (line && line.set_payment_status) {
