@@ -39,6 +39,7 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
 
             var settled = false;
             var unsubscribe = null;
+            var isFirstSnapshot = true;
 
             function finish(err, data) {
                 if (settled) return;
@@ -61,21 +62,33 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
                 finish(new Error('Reconciliation timeout'));
             }, timeoutMs);
 
-            var query = firestoreDb.collection('reconciliations')
-                .where('id', '==', String(orderId))
-                .where('posid', '==', String(posid));
-
-            unsubscribe = query.onSnapshot(
+            // Listen for new documents in reconciliations collection (like old impl, no filtered query)
+            var reconciliationsRef = firestoreDb.collection('reconciliations');
+            unsubscribe = reconciliationsRef.onSnapshot(
                 function (snapshot) {
                     if (cancelRef.cancelled) {
                         console.log('[Seerbit] reconciliation listener cancelled');
                         finish(new Error('cancelled'));
                         return;
                     }
+                    // Skip initial snapshot: Firestore fires immediately with existing docs as 'added'
+                    if (isFirstSnapshot) {
+                        isFirstSnapshot = false;
+                        return;
+                    }
                     snapshot.docChanges().forEach(function (change) {
-                        if (change.type !== 'added' && change.type !== 'modified') return;
+                        if (change.type !== 'added') return;
                         var data = change.doc.data();
-                        if (isSuccessStatus(data?.status)) {
+                        // Match by id and posid (no localStorage), check success status
+                        if (data?.id === orderId && data?.posid === posid && isSuccessStatus(data?.status)) {
+                            console.log('[Seerbit firebase_listener] reconciliation received', {
+                                orderId: orderId,
+                                posid: posid,
+                                docId: data?.id,
+                                docPosid: data?.posid,
+                                status: data?.status,
+                                data:data
+                            });
                             finish(null, data);
                         }
                     });

@@ -28,6 +28,13 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
 
             const terminal = line.payment_method.payment_terminal;
 
+            // Unsubscribe any existing listener (e.g. from main flow) to avoid duplicate handlers
+            if (terminal && terminal._reconciliationUnsubscribe) {
+                terminal._reconciliationUnsubscribe();
+                terminal._reconciliationUnsubscribe = null;
+                terminal._reconciliationReject = null;
+            }
+
             FirebaseListener.waitForReconciliationByOrderId(orderId, posid, {
                 timeoutMs: 1200000,
                 onReady: (unsubscribe, rejectOnce) => {
@@ -41,6 +48,12 @@ odoo.define('pos_seerbit.PaymentScreen', function(require) {
                     const l = order.paymentlines.find(
                         (pl) => pl.payment_method.use_payment_terminal === 'seerbit' && !pl.is_done()
                     );
+                    console.log('[Seerbit PaymentScreen] reconciliation .then (reconnect)', {
+                        orderId,
+                        posid,
+                        hasLine: !!l,
+                        lineAmount: l ? l.amount : null,
+                    });
                     if (!l || l !== line || !terminal || !terminal._markPaymentSuccessful) return;
                     terminal._markPaymentSuccessful(l, data, orderId, posid);
                 })
