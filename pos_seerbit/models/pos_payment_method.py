@@ -173,6 +173,11 @@ def send_to_firestore_transactions(env, payload):
     # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
     if FIRESTORE_AVAILABLE:
         try:
+            # Initialize Firestore if not already initialized
+            if not initialize_firestore(env):
+                _logger.warning("Firestore initialization failed. Using fallback endpoint...")
+                return _send_to_fallback(env, firestore_payload)
+            
             _logger.info('Sending payment request to Firestore: %s',
                          pprint.pformat(payload))
             
@@ -188,7 +193,8 @@ def send_to_firestore_transactions(env, payload):
             return True
         except Exception as e:
             _logger.error("Failed to send payment request to Firestore: %s", str(e))
-            return False
+            _logger.warning("Falling back to API endpoint...")
+            return _send_to_fallback(env, firestore_payload)
     # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
     else:
         _logger.warning("Firestore SDK not available. Using fallback endpoint...")
