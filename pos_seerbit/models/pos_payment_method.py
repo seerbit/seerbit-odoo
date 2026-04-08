@@ -110,14 +110,8 @@ def initialize_firestore(env):
         _logger.warning("Failed to initialize Firestore: %s", str(e))
         return False
 
-# Try to initialize Firestore on module load
-# Note: This will only work if the module is enabled and configured
-try:
-    # We need an environment to initialize Firestore
-    # This will be done when the first payment method is accessed
-    pass
-except Exception as e:
-    _logger.debug("Firestore initialization deferred: %s", str(e))
+# Firestore initialization is deferred until first use
+# when a payment method is accessed
 
 
 # -------------------------------------------------------
@@ -198,9 +192,7 @@ def send_to_firestore_transactions(env, payload):
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
-    def _get_payment_terminal_selection(self):
-        return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
-
+    
     # Seerbit Fields
     seerbit_public_key = fields.Char(
         string="Seerbit Public Key", 
@@ -217,6 +209,16 @@ class PosPaymentMethod(models.Model):
         groups="base.group_erp_manager"
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
+    def _get_payment_terminal_selection(self):
+        
+        return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
+
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+       data = super()._load_pos_data_fields(config_id)
+       data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
+       return data
     @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
@@ -264,10 +266,10 @@ class PosPaymentMethod(models.Model):
         
         if firestore_success:
             _logger.info(
-                "Seerbit payment request saved to Odoo and sent to Firestore: %s", pprint.pformat(payload))
+                "Seerbit payment request processed successfully for transaction ID: %s", payload.get('id', 'unknown'))
         else:
             _logger.warning(
-                "Seerbit payment request saved to Odoo but Firestore send failed: %s", pprint.pformat(payload))
+                "Seerbit payment request saved to Odoo but Firestore send failed for transaction ID: %s", payload.get('id', 'unknown'))
         
         return False
 

@@ -1,26 +1,26 @@
-odoo.define('pos_seerbit.firebase_listener', function (require) {
-    "use strict";
+/** @odoo-module **/
 
-    var core = require('web.core');
-    var rpc = require('web.rpc');
-    const { Gui } = require('point_of_sale.Gui');
-    var _t = core._t;
+import { _t } from '@web/core/l10n/translation';
+import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
+import FirebaseInit from './firebase_init';
 
-    // Import Firebase initialization
-    var FirebaseInit = require('pos_seerbit.firebase_init');
+// Track active listeners to prevent duplicates
+const activeListeners = new Map();
 
-    function listenForReconciliation(transactionId) {
-        console.log('Setting up reconciliation listener for transaction:', transactionId);
-        
-        // Ensure Firebase is initialized
+// Listen for payment reconciliation updates
+function listenForReconciliation(transactionId, env) {
+    // If we already have a listener for this transaction, don't create another one
+    if (activeListeners.has(transactionId)) {
+        console.log('Listener already exists for transaction:', transactionId);
+        return;
+    }
+
+    const initializeListener = () => {
         if (!FirebaseInit.isFirebaseAvailable()) {
             console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
-            
-            // Try to reinitialize Firebase
-            FirebaseInit.reinitializeFirebase().then(function(success) {
+            FirebaseInit.reinitializeFirebase(window.__owl__.root.env.services.orm).then(function(success) {
                 if (success) {
-                    console.log('Firestore reinitialized successfully, setting up listener');
-                    listenForReconciliation(transactionId);
+                    initializeListener();
                 } else {
                     console.error('Failed to reinitialize Firestore');
                 }
@@ -34,17 +34,10 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
             return;
         }
 
-        console.log('Setting up Firestore reconciliation listener...');
-        
-        // Listen for new documents in reconciliations collection
-        const reconciliationsRef = firestoreDb.collection('reconciliations');
-        const unsubscribe = reconciliationsRef.onSnapshot(function(snapshot) {
-            console.log('Reconciliation snapshot received with', snapshot.docChanges().length, 'changes');
-            
-            snapshot.docChanges().forEach(function(change) {
-                if (change.type === 'added') {
-                    const data = change.doc.data();
-                    console.log('Reconciliation data received:', data);
+        // Query without orderBy to avoid composite index requirement
+        const reconciliationsRef = firestoreDb.collection('reconciliations')
+            .where('id', '==', transactionId)
+            .limit(1);
 
                     const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
                     if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
@@ -53,33 +46,58 @@ odoo.define('pos_seerbit.firebase_listener', function (require) {
                         // Set completed transaction in localStorage for polling to detect?
                         localStorage.setItem('completed_transaction', JSON.stringify(data));
                         
-                        // Show success message
-                        Gui.showPopup('ConfirmPopup', {
-                            title: _t('Payment Successful'),
-                            body: _t('Payment has been successfully processed.'),
-                        });
+                        // Validate the transaction matches our pending one
+                        if (pending && data?.id === pending?.id && data?.posid === pending?.posid ) {
+                            const status = String(data?.status || '').toLowerCase();
+                            if (['success', 'completed', 'complete', 'done', 'successful'].includes(status)) {
+                                // Store the completed transaction
+                                localStorage.setItem('completed_transaction', JSON.stringify(data));
+                                console.log('Payment reconciliation completed successfully');
+                                
+                                // Clean up the listener after successful processing
+                                cleanupListener(transactionId);
+                            }
+                        }
                     }
-                }
-            });
-        }, function(error) {
-            console.error('Firestore listener error:', error);
-        });
-    }
+                });
+            },
+            (error) => {
+                console.error('Firestore listener error:', error);
+                cleanupListener(transactionId);
+            }
+        );
 
-    // Auto-start listener for any pending transaction on page load
-    function startListenerForPendingTransaction() {
-        const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-        if (pending && pending.id) {
-            console.log('Found pending transaction, starting listener for:', pending.id);
-            listenForReconciliation(pending.id);
-        }
-    }
-
-    // Start listener when module loads
-    startListenerForPendingTransaction();
-
-    return {
-        listenForReconciliation: listenForReconciliation,
-        startListenerForPendingTransaction: startListenerForPendingTransaction
+        // Store the unsubscribe function
+        activeListeners.set(transactionId, unsubscribe);
     };
-}); 
+
+    initializeListener();
+}
+
+// Clean up a listener by transaction ID
+function cleanupListener(transactionId) {
+    const unsubscribe = activeListeners.get(transactionId);
+    if (unsubscribe) {
+        unsubscribe();
+        activeListeners.delete(transactionId);
+        console.log('Cleaned up listener for transaction:', transactionId);
+    }
+}
+
+// Clean up all listeners
+function cleanupAllListeners() {
+    for (const [id, unsubscribe] of activeListeners.entries()) {
+        unsubscribe();
+        console.log('Cleaned up listener for transaction:', id);
+    }
+    activeListeners.clear();
+}
+
+// Clean up on page unload
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', cleanupAllListeners);
+}
+
+export default {
+    listenForReconciliation
+};

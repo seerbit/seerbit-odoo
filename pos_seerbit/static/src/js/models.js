@@ -1,5 +1,9 @@
-odoo.define('pos_seerbit.models', function (require) {
-    const { register_payment_method } = require('point_of_sale.models');
-    const PaymentSeerbit = require('pos_seerbit.payment');
+/** @odoo-module **/
+
+import { register_payment_method } from '@point_of_sale/app/store/pos_store';
+import PaymentSeerbit from './payment_seerbit';
+
+// Register Seerbit payment method with POS store
     register_payment_method('seerbit', PaymentSeerbit);
-});
+
+    
