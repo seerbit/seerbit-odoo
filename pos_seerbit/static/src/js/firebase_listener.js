@@ -39,12 +39,18 @@ function listenForReconciliation(transactionId, env) {
             .where('id', '==', transactionId)
             .limit(1);
 
-                    const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
-                    if (pending && (data?.id === pending?.id && data?.posid === pending?.posid) && ['success', 'completed', 'complete', 'done', 'successful'].includes(String(data?.status).toLowerCase())) {
-                        console.log('Matching transaction found, setting completed_transaction...');
-                        
-                        // Set completed transaction in localStorage for polling to detect?
-                        localStorage.setItem('completed_transaction', JSON.stringify(data));
+        const unsubscribe = reconciliationsRef.onSnapshot(
+            async (snapshot) => {
+                if (snapshot.empty) {
+                    console.log('No matching transaction found for ID:', transactionId);
+                    return;
+                }
+
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
+                        console.log('Payment reconciliation data received:', data);
                         
                         // Validate the transaction matches our pending one
                         if (pending && data?.id === pending?.id && data?.posid === pending?.posid ) {

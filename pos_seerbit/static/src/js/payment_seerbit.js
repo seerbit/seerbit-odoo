@@ -62,8 +62,6 @@ export default class SeerbitPayment extends PaymentInterface {
             const hour = String(now.getHours()).padStart(2, '0');
             const minute = String(now.getMinutes()).padStart(2, '0');
             const receivedDateTime = `${day}/${month}/${year} ${hour}:${minute}`;
-            
-            // Create metadata with additional server fields
             const metadata = JSON.stringify({
                 'created_by': 'odoo_pos_seerbit',
                 'created_time': now.toISOString(),
@@ -188,11 +186,14 @@ export default class SeerbitPayment extends PaymentInterface {
                 body: _t('Payment has been successfully processed.'),
             });
 
-        _poll_for_response: function (resolve, reject) {
-            var self = this;
-            if (this.was_cancelled || !this.pos.get_order().selected_paymentline) {
-                console.log('was_cancelled', this.was_cancelled);
-                return reject(); 
+            resolve(true);
+            
+        } catch (error) {
+            console.error('Error processing payment response:', error);
+            this._reset_seerbit_state();
+            
+            if (paymentLine) {
+                paymentLine.set_payment_status('errorSeerbit');
             }
             
             this.env.services.dialog.add(AlertDialog, {
@@ -204,42 +205,22 @@ export default class SeerbitPayment extends PaymentInterface {
         }
     }
 
-            // Check localStorage for completed transaction first
-            const completedTransaction = localStorage.getItem('completed_transaction');
-            if (completedTransaction) {
-                try {
-                    const transactionData = JSON.parse(completedTransaction);
-                    console.log('Found completed transaction in localStorage:', transactionData);
-                    
-                    var line = self.pending_seerbit_line();
-                    if (line) {
-                        // Mark payment as done
-                        line.set_payment_status('done');
-                        line.set_receipt_info('Transaction ID: ' + (transactionData?.sessionId || transactionData?.transactionRef || transactionData?.id));
-                        line.transaction_id = transactionData?.sessionId || transactionData?.transactionRef || transactionData?.id;
-                        line.card_type = 'Seerbit';
-                        line.cardholder_name = 'Seerbit Payment';
-                        
-                        // Clear localStorage
-                        localStorage.removeItem('completed_transaction');
-                        localStorage.removeItem('pending_transaction');
-                        
-                        resolve(true);
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error parsing completed transaction:', error);
-                    localStorage.removeItem('completed_transaction');
-                    let line = this.pending_seerbit_line();
-                        if (line) {
-                            line.set_payment_status('errorSeerbit');
-                        };
-                        this._show_error(
-                            _t('Error Marking payment as done'),
-                            'Odoo Error'
-                        );
-                        reject();
-                }
+    _reset_seerbit_state() {
+        // Clear any pending intervals
+        clearInterval(this.seerbit_polling);
+        
+        // Reset state variables
+        this.seerbit_polling = null;
+        this.seerbit_was_cancelled = false;
+        
+        // Clear any pending transactions from localStorage
+        const pending = localStorage.getItem('pending_transaction');
+        if (pending) {
+            try {
+                const pendingData = JSON.parse(pending);
+                console.log('Cleaning up pending transaction:', pendingData.id);
+            } catch (e) {
+                console.warn('Error parsing pending transaction:', e);
             }
         }
         localStorage.removeItem('pending_transaction');
