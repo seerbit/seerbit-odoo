@@ -8,14 +8,14 @@ import { onMounted, onWillUnmount } from '@odoo/owl';
 patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
-        onMounted(() => {
-            // Set pending Seerbit payments to waiting status
-            const pendingPaymentLine = this.env.services.pos.getPendingPaymentLine('seerbit')
-            if (pendingPaymentLine) {
-                console.log('Found pending Seerbit line')
-                pendingPaymentLine.set_payment_status('waitingSeerbit');
-            }
-        });
+        // onMounted(() => {
+        //     // Set pending Seerbit payments to waiting status
+        //     const pendingPaymentLine = this.env.services.pos.getPendingPaymentLine('seerbit')
+        //     if (pendingPaymentLine) {
+        //         console.log('Found pending Seerbit line')
+        //         pendingPaymentLine.set_payment_status('waitingSeerbit');
+        //     }
+        // });
 
         onWillUnmount(() => {
             // When leaving the payment screen, ensure any Seerbit processes are stopped.
@@ -41,7 +41,7 @@ patch(PaymentScreen.prototype, {
 
     async sendPaymentRequest(line) {
         const payment_terminal = line.payment_method_id.payment_terminal;
-        await payment_terminal.sendPaymentRequest(line);
+        await payment_terminal.sendPaymentRequest(line.uuid);
     },
     paymentMethodImage(id) {
         if (this.paymentMethod.use_payment_terminal === "seerbit") {
@@ -64,15 +64,12 @@ patch(PaymentScreen.prototype, {
             this.numberBuffer.reset();
             return;
         }
-        if (["waiting", "waitingSeerbit", "waitingCard", "timeout"].includes(line.get_payment_status()) && line.payment_method_id.payment_terminal) {
+        if (["waiting", "waitingCancel"].includes(line.get_payment_status()) && line.payment_method_id.payment_terminal) {
             line.set_payment_status("waitingCancel");
             this.sendPaymentCancel(line).then( () => {
-            line.payment_method_id.payment_terminal.sendPaymentCancel(this.currentOrder, uuid).then( () => {
                 this.currentOrder.remove_paymentline(line);
                 this.numberBuffer.reset();
-            }
-            );
-        })
+            });
         } else if (line.get_payment_status() !== "waitingCancel") {
             this.currentOrder.remove_paymentline(line);
             this.numberBuffer.reset();
