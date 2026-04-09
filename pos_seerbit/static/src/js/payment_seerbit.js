@@ -235,7 +235,7 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 
 
-    async send_force_done(line) {
+    async sendForceDone(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
             line.set_payment_status('done');
             line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id?.uuid)?.toString());

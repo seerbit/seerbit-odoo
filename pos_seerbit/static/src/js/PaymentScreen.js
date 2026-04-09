@@ -36,9 +36,12 @@ patch(PaymentScreen.prototype, {
     
     async sendForceDone(line) {
         const payment_terminal = line.payment_method_id.payment_terminal;
-         await payment_terminal.send_force_done(
-            line
-        );
+        await payment_terminal.sendForceDone(line);
+    },
+
+    async sendPaymentRequest(line) {
+        const payment_terminal = line.payment_method_id.payment_terminal;
+        await payment_terminal.sendPaymentRequest(line);
     },
     paymentMethodImage(id) {
         if (this.paymentMethod.use_payment_terminal === "seerbit") {

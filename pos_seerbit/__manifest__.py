@@ -48,7 +48,6 @@
             "pos_seerbit/static/src/js/payment_seerbit.js",
             "pos_seerbit/static/src/js/firebase_listener.js",
             "pos_seerbit/static/src/scss/pos.scss",
-            "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
             
         ],
     },
