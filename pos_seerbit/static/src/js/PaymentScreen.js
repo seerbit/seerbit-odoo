@@ -48,6 +48,22 @@ patch(PaymentScreen.prototype, {
         const payment_terminal = line.payment_method_id.payment_terminal;
         await payment_terminal.sendPaymentRequest(line.uuid);
     },
+    addNewPaymentLine(paymentMethod) {
+        if (paymentMethod && paymentMethod.use_payment_terminal === 'seerbit') {
+            if (paymentMethod.payment_terminal && typeof paymentMethod.payment_terminal.fastPayments !== 'undefined') {
+                const line = super.addNewPaymentLine(paymentMethod);
+                if (paymentMethod.payment_terminal.fastPayments && line) {
+                    this._startPaymentLineReconciliation(line);
+                }
+                return line;
+            }
+        }
+        return super.addNewPaymentLine(paymentMethod);
+    },
+
+    _startPaymentLineReconciliation(line) {
+        console.log('Started payment line reconciliation for line:', line.uuid);
+    },
     paymentMethodImage(id) {
         if (this.paymentMethod.use_payment_terminal === "seerbit") {
             return "/pos_seerbit/static/description/icon.png";
@@ -64,18 +80,23 @@ patch(PaymentScreen.prototype, {
     },
     deletePaymentLine(uuid) {
         const line = this.paymentLines.find( (line) => line.uuid === uuid);
+        if (!line) {
+            console.warn('Payment line not found for uuid:', uuid);
+            return;
+        }
         if (line.payment_method_id.payment_method_type === "qr_code") {
             this.currentOrder.remove_paymentline(line);
             this.numberBuffer.reset();
             return;
         }
-        if (["waiting", "waitingCancel"].includes(line.get_payment_status()) && line.payment_method_id.payment_terminal) {
+        const paymentStatus = line.get_payment_status ? line.get_payment_status() : undefined;
+        if (["waiting", "waitingCancel"].includes(paymentStatus) && line.payment_method_id.payment_terminal) {
             line.set_payment_status("waitingCancel");
             this.sendPaymentCancel(line).then( () => {
                 this.currentOrder.remove_paymentline(line);
                 this.numberBuffer.reset();
             });
-        } else if (line.get_payment_status() !== "waitingCancel") {
+        } else if (paymentStatus !== "waitingCancel") {
             this.currentOrder.remove_paymentline(line);
             this.numberBuffer.reset();
         }
