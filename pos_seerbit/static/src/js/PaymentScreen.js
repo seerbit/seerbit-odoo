@@ -2,7 +2,9 @@
 
 import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
 import { patch } from '@web/core/utils/patch';
-import { onMounted, onWillUnmount } from '@odoo/owl';
+import { onWillUnmount } from '@odoo/owl';
+import { _t } from '@web/core/l10n/translation';
+import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
 
 // Patch PaymentScreen to handle Seerbit payment line status
 patch(PaymentScreen.prototype, {
@@ -49,14 +51,35 @@ patch(PaymentScreen.prototype, {
         await payment_terminal.sendPaymentRequest(line.uuid);
     },
     addNewPaymentLine(paymentMethod) {
-        if (paymentMethod && paymentMethod.use_payment_terminal === 'seerbit') {
+        if (paymentMethod?.use_payment_terminal === 'seerbit') {
             const paymentTerminal = paymentMethod.payment_terminal;
-            if (paymentTerminal && typeof paymentTerminal.fastPayments !== 'undefined') {
-                const line = super.addNewPaymentLine(paymentMethod);
-                if (paymentTerminal.fastPayments && line) {
-                    this._startPaymentLineReconciliation(line);
+            if (!paymentTerminal) {
+                return super.addNewPaymentLine(paymentMethod);
+            }
+            if (this.pos.paymentTerminalInProgress) {
+                this.dialog.add(AlertDialog, {
+                    title: _t("Error"),
+                    body: _t("There is already an electronic payment in progress."),
+                });
+                return false;
+            }
+            if (this.paymentLines.length === 0) {
+                this.makeAnimation();
+            }
+            const result = this.currentOrder.addPaymentline(paymentMethod);
+            if (result.status) {
+                this.numberBuffer.set(result.data.amount.toString());
+                if (paymentTerminal.fastPayments) {
+                    const newPaymentLine = this.paymentLines.at(-1);
+                    this.sendPaymentRequest(newPaymentLine);
                 }
-                return line;
+                return true;
+            } else {
+                this.dialog.add(AlertDialog, {
+                    title: _t("Error"),
+                    body: result.data,
+                });
+                return false;
             }
         }
         return super.addNewPaymentLine(paymentMethod);
