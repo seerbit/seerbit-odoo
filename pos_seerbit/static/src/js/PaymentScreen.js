@@ -55,69 +55,35 @@ patch(PaymentScreen.prototype, {
         await payment_terminal.sendPaymentRequest(line.uuid);
     },
     async addNewPaymentLine(paymentMethod) {
-        if (paymentMethod && paymentMethod.use_payment_terminal) {
-            if (paymentMethod.use_payment_terminal === 'seerbit') {
-                if (this.pos.paymentTerminalInProgress) {
-                    this.dialog.add(AlertDialog, {
-                        title: _t("Error"),
-                        body: _t("There is already an electronic payment in progress."),
-                    });
-                    return;
-                }
-                if (this.paymentLines.length === 0) {
-                    this.makeAnimation();
-                }
-                const result = this.currentOrder.addPaymentline(paymentMethod);
-                if (result.status) {
-                    this.numberBuffer.set(result.data.amount.toString());
-                    const newPaymentLine = this.paymentLines.at(-1);
-                    if (newPaymentLine && newPaymentLine.payment_method_id && newPaymentLine.payment_method_id.payment_terminal) {
-                        this.sendPaymentRequest(newPaymentLine);
-                    } else {
-                        this.pos.paymentTerminalInProgress = false;
-                    }
-                    return true;
-                } else {
-                    this.dialog.add(AlertDialog, {
-                        title: _t("Error"),
-                        body: result.data,
-                    });
-                    return false;
-                }
-            }
-            try {
-                if (this.pos.paymentTerminalInProgress) {
-                    this.dialog.add(AlertDialog, {
-                        title: _t("Error"),
-                        body: _t("There is already an electronic payment in progress."),
-                    });
-                    return;
-                }
-                if (this.paymentLines.length === 0) {
-                    this.makeAnimation();
-                }
-                const result = this.currentOrder.addPaymentline(paymentMethod);
-                if (result.status) {
-                    this.numberBuffer.set(result.data.amount.toString());
-                    if (paymentMethod.payment_terminal && paymentMethod.payment_terminal.fastPayments) {
-                        const newPaymentLine = this.paymentLines.at(-1);
-                        if (newPaymentLine && newPaymentLine.payment_method_id && newPaymentLine.payment_method_id.payment_terminal) {
-                            this.sendPaymentRequest(newPaymentLine);
-                        }
-                    }
-                    return true;
-                } else {
-                    this.dialog.add(AlertDialog, {
-                        title: _t("Error"),
-                        body: result.data,
-                    });
-                    return false;
-                }
-            } catch (e) {
-                return super.addNewPaymentLine(paymentMethod);
-            }
+        if (!paymentMethod?.use_payment_terminal) {
+            return super.addNewPaymentLine(paymentMethod);
         }
-        return super.addNewPaymentLine(paymentMethod);
+        if (this.pos.paymentTerminalInProgress) {
+            this.dialog.add(AlertDialog, {
+                title: _t("Error"),
+                body: _t("There is already an electronic payment in progress."),
+            });
+            return;
+        }
+        if (this.paymentLines.length === 0) {
+            this.makeAnimation();
+        }
+        const result = this.currentOrder.addPaymentline(paymentMethod);
+        if (!result.status) {
+            this.dialog.add(AlertDialog, {
+                title: _t("Error"),
+                body: result.data,
+            });
+            return false;
+        }
+        this.numberBuffer.set(result.data.amount.toString());
+        const newPaymentLine = this.paymentLines.at(-1);
+        if (newPaymentLine?.payment_method_id?.payment_terminal) {
+            this.sendPaymentRequest(newPaymentLine);
+        } else {
+            this.pos.paymentTerminalInProgress = false;
+        }
+        return true;
     },
 
     _startPaymentLineReconciliation(line) {
