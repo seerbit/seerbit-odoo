@@ -11,7 +11,7 @@ _logger = logging.getLogger(__name__)
 
 
 class SeerbitController(http.Controller):
-    @http.route('/pos_seerbit/notification', type='json', auth='public', methods=['POST'], csrf=False)
+    @http.route('/pos_seerbit/notification', type='jsonrpc', auth='public', methods=['POST'], csrf=False)
     def seerbit_notification(self, **kwargs):
         '''
         This is the webhook intended for listening to only Seerbit notifications
