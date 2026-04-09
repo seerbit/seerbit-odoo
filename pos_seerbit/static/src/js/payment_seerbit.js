@@ -54,7 +54,7 @@ export default class SeerbitPayment extends PaymentInterface {
             });
             return false;
         }
-        line.set_payment_status('waiting');
+        line.setPaymentStatus('waiting');
         return this._send_seerbit_payment_request_to_firestore(line);
     }
 
@@ -121,8 +121,8 @@ export default class SeerbitPayment extends PaymentInterface {
             return this._seerbit_start_get_status_polling(paymentLine);
         }).catch(async (error) => {
             console.error('Payment request failed:', error);
-            if (paymentLine?.set_payment_status) {
-                paymentLine.set_payment_status('waiting');
+            if (paymentLine?.setPaymentStatus) {
+                paymentLine.setPaymentStatus('waiting');
             }
             await this.env.services.dialog.add(AlertDialog, {
                 title: _t('Seerbit Warning'),
@@ -149,7 +149,7 @@ export default class SeerbitPayment extends PaymentInterface {
     async _seerbit_poll_for_response(paymentLine, resolve, reject) {
         if (this.seerbit_was_cancelled) {
             console.log('Payment was cancelled by user');
-            paymentLine.set_payment_status('waitingCancel');
+            paymentLine.setPaymentStatus('waitingCancel');
             this._reset_seerbit_state();
             return reject();
         }
@@ -176,10 +176,10 @@ export default class SeerbitPayment extends PaymentInterface {
                 return;
             }
 
-            paymentLine.set_payment_status('done');
+            paymentLine.setPaymentStatus('done');
             
             const transactionId = transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
-            paymentLine.set_receipt_info('Transaction ID: ' + transactionId);
+            paymentLine.setReceiptInfo('Transaction ID: ' + transactionId);
             paymentLine.transaction_id = transactionId;
             paymentLine.card_type = 'Seerbit';
             paymentLine.cardholder_name = 'Seerbit Payment';
@@ -196,7 +196,7 @@ export default class SeerbitPayment extends PaymentInterface {
             this._reset_seerbit_state();
             
             if (paymentLine) {
-                paymentLine.set_payment_status('error');
+                paymentLine.setPaymentStatus('error');
             }
             
             this.env.services.dialog.add(AlertDialog, {
@@ -230,8 +230,8 @@ export default class SeerbitPayment extends PaymentInterface {
 
     async sendForceDone(line) {
         if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
-            line.set_payment_status('done');
-            line.set_receipt_info('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id?.uuid)?.toString());
+            line.setPaymentStatus('done');
+            line.setReceiptInfo('Transaction ID: ' + (line.pos_order_id?.uuid || line.order_id?.uuid)?.toString());
             this._reset_seerbit_state();
             
             await this.env.services.dialog.add(AlertDialog, {

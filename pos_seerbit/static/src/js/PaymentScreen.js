@@ -50,9 +50,10 @@ patch(PaymentScreen.prototype, {
     },
     addNewPaymentLine(paymentMethod) {
         if (paymentMethod && paymentMethod.use_payment_terminal === 'seerbit') {
-            if (paymentMethod.payment_terminal && typeof paymentMethod.payment_terminal.fastPayments !== 'undefined') {
+            const paymentTerminal = paymentMethod.payment_terminal;
+            if (paymentTerminal && typeof paymentTerminal.fastPayments !== 'undefined') {
                 const line = super.addNewPaymentLine(paymentMethod);
-                if (paymentMethod.payment_terminal.fastPayments && line) {
+                if (paymentTerminal.fastPayments && line) {
                     this._startPaymentLineReconciliation(line);
                 }
                 return line;
@@ -65,14 +66,14 @@ patch(PaymentScreen.prototype, {
         console.log('Started payment line reconciliation for line:', line.uuid);
     },
     paymentMethodImage(id) {
-        if (this.paymentMethod.use_payment_terminal === "seerbit") {
+        if (this.paymentMethod && this.paymentMethod.use_payment_terminal === "seerbit") {
             return "/pos_seerbit/static/description/icon.png";
         }
-        if (this.paymentMethod.image) {
+        if (this.paymentMethod && this.paymentMethod.image) {
             return `/web/image/pos.payment.method/${id}/image`;
-        } else if (this.paymentMethod.type === "cash") {
+        } else if (this.paymentMethod && this.paymentMethod.type === "cash") {
             return "/point_of_sale/static/src/img/money.png";
-        } else if (this.paymentMethod.type === "pay_later") {
+        } else if (this.paymentMethod && this.paymentMethod.type === "pay_later") {
             return "/point_of_sale/static/src/img/pay-later.png";
         }  else {
             return "/point_of_sale/static/src/img/card-bank.png";
@@ -85,19 +86,19 @@ patch(PaymentScreen.prototype, {
             return;
         }
         if (line.payment_method_id.payment_method_type === "qr_code") {
-            this.currentOrder.remove_paymentline(line);
+            this.currentOrder.removePaymentline(line);
             this.numberBuffer.reset();
             return;
         }
-        const paymentStatus = line.get_payment_status ? line.get_payment_status() : undefined;
-        if (["waiting", "waitingCancel"].includes(paymentStatus) && line.payment_method_id.payment_terminal) {
-            line.set_payment_status("waitingCancel");
+        const paymentStatus = line.getPaymentStatus ? line.getPaymentStatus() : undefined;
+        if (["waiting", "waitingCancel", "waitingCard", "timeout"].includes(paymentStatus) && line.payment_method_id.payment_terminal) {
+            line.setPaymentStatus("waitingCancel");
             this.sendPaymentCancel(line).then( () => {
-                this.currentOrder.remove_paymentline(line);
+                this.currentOrder.removePaymentline(line);
                 this.numberBuffer.reset();
             });
         } else if (paymentStatus !== "waitingCancel") {
-            this.currentOrder.remove_paymentline(line);
+            this.currentOrder.removePaymentline(line);
             this.numberBuffer.reset();
         }
     }
