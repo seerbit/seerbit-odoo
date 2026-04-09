@@ -47,6 +47,10 @@ patch(PaymentScreen.prototype, {
     },
 
     async sendPaymentRequest(line) {
+        if (!line || !line.payment_method_id || !line.payment_method_id.payment_terminal) {
+            console.warn('Payment terminal not available for line:', line);
+            return;
+        }
         const payment_terminal = line.payment_method_id.payment_terminal;
         await payment_terminal.sendPaymentRequest(line.uuid);
     },
@@ -67,7 +71,11 @@ patch(PaymentScreen.prototype, {
                 if (result.status) {
                     this.numberBuffer.set(result.data.amount.toString());
                     const newPaymentLine = this.paymentLines.at(-1);
-                    this.sendPaymentRequest(newPaymentLine);
+                    if (newPaymentLine && newPaymentLine.payment_method_id && newPaymentLine.payment_method_id.payment_terminal) {
+                        this.sendPaymentRequest(newPaymentLine);
+                    } else {
+                        this.pos.paymentTerminalInProgress = false;
+                    }
                     return true;
                 } else {
                     this.dialog.add(AlertDialog, {
@@ -93,7 +101,9 @@ patch(PaymentScreen.prototype, {
                     this.numberBuffer.set(result.data.amount.toString());
                     if (paymentMethod.payment_terminal && paymentMethod.payment_terminal.fastPayments) {
                         const newPaymentLine = this.paymentLines.at(-1);
-                        this.sendPaymentRequest(newPaymentLine);
+                        if (newPaymentLine && newPaymentLine.payment_method_id && newPaymentLine.payment_method_id.payment_terminal) {
+                            this.sendPaymentRequest(newPaymentLine);
+                        }
                     }
                     return true;
                 } else {
