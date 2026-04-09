@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { PaymentInterface } from '@point_of_sale/app/payment/payment_interface';
+import { PaymentInterface } from '@point_of_sale/app/utils/payment/payment_interface';
 import { _t } from '@web/core/l10n/translation';
 import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
 import { registry } from '@web/core/registry';
@@ -19,20 +19,22 @@ function initializeSeerbitFirebase(orm) {
 }
 
 export default class SeerbitPayment extends PaymentInterface {
-    constructor(pos, payment_method_id) {
-        super(pos, payment_method_id);
-        this.payment_method_id = payment_method_id;
-        this.env = pos.env;
-        this.pos = pos;
+    setup() {
+        super.setup(...arguments);
         this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
-        this.supports_reversals = false; // Seerbit doesn't support reversals
-        initializeSeerbitFirebase(this.pos.env.services.orm);
+        this.supports_reversals = false;
+        initializeSeerbitFirebase(this.env.services.orm);
     }
 
-    async send_payment_request(cid) {
-            const order = this.pos.get_order();
-        const paymentLine = order.get_selected_paymentline();
+    get payment_method_id() {
+        return this.pos.get_order().payment_lines.find(line => 
+            line.payment_method_id.use_payment_terminal === 'seerbit'
+        )?.payment_method_id;
+    }
+
+    async sendPaymentRequest(line) {
+        const paymentLine = line;
         if (paymentLine.amount < 0.01) {
             await this.env.services.dialog.add(AlertDialog, {
                 title: _t('Amount Error'),
@@ -44,8 +46,7 @@ export default class SeerbitPayment extends PaymentInterface {
         return this._send_seerbit_payment_request_to_firestore(paymentLine);
     }
 
-    async send_payment_cancel(order, uuid) {
-
+    async sendPaymentCancel(order, uuid) {
         this.seerbit_was_cancelled = true;
         this._reset_seerbit_state();
         return true;

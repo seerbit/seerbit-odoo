@@ -64,7 +64,7 @@ patch(PaymentScreen.prototype, {
         if (["waiting", "waitingSeerbit", "waitingCard", "timeout"].includes(line.get_payment_status()) && line.payment_method_id.payment_terminal) {
             line.set_payment_status("waitingCancel");
             this.sendPaymentCancel(line).then( () => {
-            line.payment_method_id.payment_terminal.send_payment_cancel(this.currentOrder, uuid).then( () => {
+            line.payment_method_id.payment_terminal.sendPaymentCancel(this.currentOrder, uuid).then( () => {
                 this.currentOrder.remove_paymentline(line);
                 this.numberBuffer.reset();
             }
