@@ -3,6 +3,7 @@
 import { PaymentInterface } from '@point_of_sale/app/payment/payment_interface';
 import { _t } from '@web/core/l10n/translation';
 import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
+import { registry } from '@web/core/registry';
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
@@ -254,3 +255,6 @@ export default class SeerbitPayment extends PaymentInterface {
         this._reset_seerbit_state();
     }
 }
+
+// Register the Seerbit payment terminal in the Odoo 19 registry
+registry.category('payment_terminals').add('seerbit', SeerbitPayment);

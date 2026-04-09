@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Seerbit Odoo Point of Sale",
-    "version": "0.1.5",
+    "version": "0.2.0",
     "category": "Sales/Point of Sale",
     "summary": "Integrate your POS with a Seerbit payment terminal with real-time payment and reconciliation.",
     "description": """
@@ -15,7 +15,7 @@
         - Configurable through Odoo settings
         
         # Compatibility:
-        - Odoo 17.0, 18.0
+        - Odoo 17.0, 18.0, 19.0
     """,
     "author": "Seerbit",
     "website": "https://github.com/seerbit/seerbit-odoo",

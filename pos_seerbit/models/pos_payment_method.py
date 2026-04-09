@@ -42,7 +42,7 @@ except ImportError as e:
     firestore = None
     _logger.warning("Firebase Admin SDK not available: %s", str(e))
 
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, models as models_module
 from odoo.exceptions import ValidationError
 from werkzeug.exceptions import Forbidden
 
@@ -66,8 +66,9 @@ def initialize_firestore(env):
     try:
         # Get Firestore config from Odoo settings
         config = env['ir.config_parameter'].sudo()
-        cred_json = config.get_param('pos_seerbit.seerbit_firestore_cred')
-        project_id = config.get_param('pos_seerbit.seerbit_firestore_project_id')
+        # Odoo 19: New API with default parameter support
+        cred_json = config.get_param('pos_seerbit.seerbit_firestore_cred', default=None)
+        project_id = config.get_param('pos_seerbit.seerbit_firestore_project_id', default=None)
 
         if not cred_json or not project_id:
             _logger.warning("Firestore configuration not available in settings. Skipping initialization.")
@@ -219,7 +220,7 @@ class PosPaymentMethod(models.Model):
        data = super()._load_pos_data_fields(config_id)
        data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
        return data
-    @api.constrains("seerbit_terminal_id")
+    @models_module.Constraint('seerbit_terminal_id')
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
             if not (payment_method.seerbit_public_key and payment_method.seerbit_terminal_id):

@@ -1,9 +1,10 @@
 /** @odoo-module **/
 
-import { register_payment_method } from '@point_of_sale/app/store/pos_store';
+import { registry } from '@web/core/registry';
 import PaymentSeerbit from './payment_seerbit';
 
-// Register Seerbit payment method with POS store
-    register_payment_method('seerbit', PaymentSeerbit);
+// Register Seerbit payment method with Odoo 19 registry system
+// Note: The payment terminal is now registered directly in payment_seerbit.js
+// This file is kept for backward compatibility and any additional model extensions
 
     
