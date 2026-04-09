@@ -50,36 +50,61 @@ patch(PaymentScreen.prototype, {
         const payment_terminal = line.payment_method_id.payment_terminal;
         await payment_terminal.sendPaymentRequest(line.uuid);
     },
-    addNewPaymentLine(paymentMethod) {
-        if (paymentMethod?.use_payment_terminal === 'seerbit') {
-            const paymentTerminal = paymentMethod.payment_terminal;
-            if (!paymentTerminal) {
-                return super.addNewPaymentLine(paymentMethod);
-            }
-            if (this.pos.paymentTerminalInProgress) {
-                this.dialog.add(AlertDialog, {
-                    title: _t("Error"),
-                    body: _t("There is already an electronic payment in progress."),
-                });
-                return false;
-            }
-            if (this.paymentLines.length === 0) {
-                this.makeAnimation();
-            }
-            const result = this.currentOrder.addPaymentline(paymentMethod);
-            if (result.status) {
-                this.numberBuffer.set(result.data.amount.toString());
-                if (paymentTerminal.fastPayments) {
+    async addNewPaymentLine(paymentMethod) {
+        if (paymentMethod && paymentMethod.use_payment_terminal) {
+            if (paymentMethod.use_payment_terminal === 'seerbit') {
+                if (this.pos.paymentTerminalInProgress) {
+                    this.dialog.add(AlertDialog, {
+                        title: _t("Error"),
+                        body: _t("There is already an electronic payment in progress."),
+                    });
+                    return;
+                }
+                if (this.paymentLines.length === 0) {
+                    this.makeAnimation();
+                }
+                const result = this.currentOrder.addPaymentline(paymentMethod);
+                if (result.status) {
+                    this.numberBuffer.set(result.data.amount.toString());
                     const newPaymentLine = this.paymentLines.at(-1);
                     this.sendPaymentRequest(newPaymentLine);
+                    return true;
+                } else {
+                    this.dialog.add(AlertDialog, {
+                        title: _t("Error"),
+                        body: result.data,
+                    });
+                    return false;
                 }
-                return true;
-            } else {
-                this.dialog.add(AlertDialog, {
-                    title: _t("Error"),
-                    body: result.data,
-                });
-                return false;
+            }
+            try {
+                if (this.pos.paymentTerminalInProgress) {
+                    this.dialog.add(AlertDialog, {
+                        title: _t("Error"),
+                        body: _t("There is already an electronic payment in progress."),
+                    });
+                    return;
+                }
+                if (this.paymentLines.length === 0) {
+                    this.makeAnimation();
+                }
+                const result = this.currentOrder.addPaymentline(paymentMethod);
+                if (result.status) {
+                    this.numberBuffer.set(result.data.amount.toString());
+                    if (paymentMethod.payment_terminal && paymentMethod.payment_terminal.fastPayments) {
+                        const newPaymentLine = this.paymentLines.at(-1);
+                        this.sendPaymentRequest(newPaymentLine);
+                    }
+                    return true;
+                } else {
+                    this.dialog.add(AlertDialog, {
+                        title: _t("Error"),
+                        body: result.data,
+                    });
+                    return false;
+                }
+            } catch (e) {
+                return super.addNewPaymentLine(paymentMethod);
             }
         }
         return super.addNewPaymentLine(paymentMethod);
