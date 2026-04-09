@@ -16,7 +16,7 @@ Key Features:
 
 import logging
 import json
-from odoo import fields, models, api, models as models_module
+from odoo import fields, models, api
 from odoo.exceptions import AccessError, ValidationError
 
 # Set up logging for this module
@@ -60,7 +60,7 @@ class ResConfigSettings(models.TransientModel):
         groups="base.group_erp_manager",
     )
 
-    @models_module.Constraint('seerbit_firestore_cred')
+    @api.constrains('seerbit_firestore_cred')
     def _validate_firestore_cred(self):
         """Validate Firestore service account JSON"""
         for record in self:

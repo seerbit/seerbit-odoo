@@ -42,7 +42,7 @@ except ImportError as e:
     firestore = None
     _logger.warning("Firebase Admin SDK not available: %s", str(e))
 
-from odoo import _, api, fields, models, models as models_module
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from werkzeug.exceptions import Forbidden
 
@@ -220,7 +220,7 @@ class PosPaymentMethod(models.Model):
        data = super()._load_pos_data_fields(config_id)
        data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
        return data
-    @models_module.Constraint('seerbit_terminal_id')
+    @api.constrains('seerbit_terminal_id')
     def _check_seerbit_autoconfirm(self):
         for payment_method in self:
             if not (payment_method.seerbit_public_key and payment_method.seerbit_terminal_id):
