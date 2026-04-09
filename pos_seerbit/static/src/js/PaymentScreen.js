@@ -39,6 +39,11 @@ patch(PaymentScreen.prototype, {
         await payment_terminal.sendForceDone(line);
     },
 
+    async sendPaymentCancel(line) {
+        const payment_terminal = line.payment_method_id.payment_terminal;
+        await payment_terminal.sendPaymentCancel(line.order, line.uuid);
+    },
+
     async sendPaymentRequest(line) {
         const payment_terminal = line.payment_method_id.payment_terminal;
         await payment_terminal.sendPaymentRequest(line.uuid);
