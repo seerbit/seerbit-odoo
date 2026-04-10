@@ -178,7 +178,8 @@ def send_to_firestore_transactions(env, payload):
 
             
         _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
-        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))        db = firestore.client()
+        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))        
+        db = firestore.client()
         doc_ref = db.collection('transactions').document()
         doc_ref.set(firestore_payload)
         _logger.info(
