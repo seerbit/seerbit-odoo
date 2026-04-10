@@ -1,9 +1,9 @@
 /** @odoo-module **/
 
 import { PaymentInterface } from '@point_of_sale/app/utils/payment/payment_interface';
+import { register_payment_method } from '@point_of_sale/app/services/pos_store';
 import { _t } from '@web/core/l10n/translation';
 import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
-import { registry } from '@web/core/registry';
 import FirebaseInit from './firebase_init';
 import FirebaseListener from './firebase_listener';
 
@@ -28,12 +28,6 @@ export default class SeerbitPayment extends PaymentInterface {
 
     get fastPayments() {
         return true;
-    }
-
-    get payment_method_id() {
-        return this.pos.getOrder().payment_ids.find(line => 
-            line.payment_method_id.use_payment_terminal === 'seerbit'
-        )?.payment_method_id;
     }
 
     async sendPaymentRequest(uuid) {
@@ -66,7 +60,7 @@ export default class SeerbitPayment extends PaymentInterface {
 
     _seerbit_pay_data(paymentLine) {
         const order = this.pos.getOrder();
-        const paymentMethod = this.payment_method_id;
+        const paymentMethod = paymentLine.payment_method_id;
 
         const now = new Date();
         const day = String(now.getDate()).padStart(2, '0');
@@ -106,7 +100,7 @@ export default class SeerbitPayment extends PaymentInterface {
             return Promise.reject(error);
         }
         if (!paymentLine.payment_method_id?.id) {
-            return;
+            return Promise.resolve(false);
         }
 
         return this.env.services.orm.call(
@@ -250,4 +244,4 @@ export default class SeerbitPayment extends PaymentInterface {
     }
 }
 
-registry.category('payment_terminals').add('seerbit', SeerbitPayment);
+register_payment_method('seerbit', SeerbitPayment);

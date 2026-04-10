@@ -41,7 +41,6 @@
             
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
-            "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/payment_seerbit.js",
