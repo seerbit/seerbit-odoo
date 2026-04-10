@@ -149,8 +149,6 @@ def send_to_firestore_transactions(env, payload):
     Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
     If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
     """
-    
-    # Ensure all values are stringified and add server timestamp
     firestore_payload = {
         'id': str(payload.get('id', '')),
         'posid': str(payload.get('posid', '')),
@@ -164,29 +162,32 @@ def send_to_firestore_transactions(env, payload):
         'transactionRef': str(payload.get('transactionRef', '')),
         'pubkey': str(payload.get('pubkey', '')),
     }
-    
-    # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
-    if FIRESTORE_AVAILABLE:
-        try:
-            _logger.info('Sending payment request to Firestore: %s',
-                         pprint.pformat(payload))
+
+    if not FIRESTORE_AVAILABLE:
+        _logger.warning("Firebase Admin SDK not installed. Using fallback endpoint...")
+        return _send_to_fallback(env, firestore_payload)
+
+    # Must initialize before firestore.client() or: "The default Firebase app does not exist"
+    if not initialize_firestore(env):
+        _logger.warning(
+            "Firestore not initialized (missing/invalid credentials or settings). Using fallback endpoint..."
+        )
+        return _send_to_fallback(env, firestore_payload)
+
+    try:
+
             
-            # Get Firestore client
-            db = firestore.client()
-            
-            # Add to transactions collection
-            doc_ref = db.collection('transactions').document()
-            doc_ref.set(firestore_payload)
-            
-            _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
-            _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))
-            return True
-        except Exception as e:
-            _logger.error("Failed to send payment request to Firestore: %s", str(e))
-            return False
-    # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
-    else:
-        _logger.warning("Firestore SDK not available. Using fallback endpoint...")
+        _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
+        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))        db = firestore.client()
+        doc_ref = db.collection('transactions').document()
+        doc_ref.set(firestore_payload)
+        _logger.info(
+            'Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id
+        )
+        return True
+    except Exception as e:
+        _logger.error("Failed to send payment request to Firestore: %s", str(e))
+        _logger.info("Attempting Seerbit fallback endpoint after Firestore error...")
         return _send_to_fallback(env, firestore_payload)
 
 
@@ -260,19 +261,18 @@ class PosPaymentMethod(models.Model):
 
     def send_seerbit_payment_request(self, payload):
         self.ensure_one()
-        
-        
-        # Try to send to Firestore
-        firestore_success = send_to_firestore_transactions(self.env, payload)
-        
-        if firestore_success:
+        ok = send_to_firestore_transactions(self.env, payload)
+        if ok:
             _logger.info(
-                "Seerbit payment request processed successfully for transaction ID: %s", payload.get('id', 'unknown'))
+                "Seerbit payment request delivered for transaction ID: %s",
+                payload.get('id', 'unknown'),
+            )
         else:
             _logger.warning(
-                "Seerbit payment request saved to Odoo but Firestore send failed for transaction ID: %s", payload.get('id', 'unknown'))
-        
-        return False
+                "Seerbit payment request could not be delivered (Firestore and fallback failed) for transaction ID: %s",
+                payload.get('id', 'unknown'),
+            )
+        return ok
 
     def get_latest_seerbit_status(self, expected):
         self.ensure_one()
