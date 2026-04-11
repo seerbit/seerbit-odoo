@@ -76,6 +76,8 @@ export default class SeerbitPayment extends PaymentInterface {
         line.card_type = 'Seerbit';
         line.cardholder_name = 'Seerbit Payment';
 
+        line.setPaymentStatus('done'); // Mark the payment line as done
+
         setTimeout(() => {
             this.env.services.dialog.add(AlertDialog, {
                 title: _t('Payment Successful'),

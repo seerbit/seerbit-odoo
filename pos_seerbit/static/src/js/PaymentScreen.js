@@ -20,6 +20,8 @@ patch(PaymentScreen.prototype, {
                     line.payment_method_id.payment_terminal.close();
                 }
             });
+            // Ensure paymentTerminalInProgress is reset when leaving the screen
+            this.pos.paymentTerminalInProgress = false;
         });
 
         // New logic to resume reconciliation for pending Seerbit payment lines
