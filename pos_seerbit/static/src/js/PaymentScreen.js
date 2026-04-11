@@ -11,6 +11,11 @@ import { onWillUnmount } from '@odoo/owl';
 patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
+        // Ensure paymentTerminalInProgress is reset when the PaymentScreen is set up
+        // This handles cases where the flag might not have been reset on unmount
+        // or when navigating back to the screen.
+        this.pos.paymentTerminalInProgress = false;
+
         onWillUnmount(() => {
             this.paymentLines.forEach((line) => {
                 if (
