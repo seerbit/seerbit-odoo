@@ -8,16 +8,6 @@ import { onWillUnmount } from '@odoo/owl';
 // Core PaymentScreen.sendPaymentRequest uses line.pay() → terminal.sendPaymentRequest → handlePaymentResponse.
 // Only extend what core does not do: Seerbit cleanup on force-done and when leaving the screen.
 
-/** @odoo-module **/
-
-import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
-import { patch } from '@web/core/utils/patch';
-import { onWillUnmount } from '@odoo/owl';
-
-// Odoo 19 wires terminals via register_payment_method → pos.payment.method.payment_terminal.
-// Core PaymentScreen.sendPaymentRequest uses line.pay() → terminal.sendPaymentRequest → handlePaymentResponse.
-// Only extend what core does not do: Seerbit cleanup on force-done and when leaving the screen.
-
 patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
