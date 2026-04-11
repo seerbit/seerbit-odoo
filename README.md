@@ -1,5 +1,5 @@
 <div align="center">
-  <img width="400" valign="top" src="./pos_seerbit/static/description/seerbit_logo.png"/>
+ <img width="400" valign="top" src="./pos_seerbit/static/description/seerbit_logo.png"/>
 </div>
 
 <h1 align="center">
@@ -7,12 +7,12 @@
     Seerbit Odoo Point of Sale</a><br/>
 </h1>
 <h2 align="center">
-    An Odoo Integration for Seerbit POS Terminal 
+An Odoo Integration for Seerbit POS Terminal 
 </h2>
 
 ## Version: 0.2.0
 
-> **Note:** As of v0.2.0, this module is compatible with Odoo 17.0, 18.0, and 19.0. It uses Firebase Firestore for payment requests and reconciliation, replacing the previous webhook-based approach. 
+> **Note:** As of v0.2.0, this module is compatible with Odoo 16.0, 17.0, 18.0, and 19.0. It uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
 
 ## How to Use
 
@@ -20,14 +20,15 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 
 ## Compatibility
 
+- **Odoo 16.0**
 - **Odoo 17.0**
 - **Odoo 18.0** 
-- **Odoo 19.0**
+- **Odoo 19.0** 
 
 ## Features
 
-- ✅ Compatible with Odoo 17.0, 18.0, and 19.0
-- ✅ Enhanced UI and payment flow for Odoo 18.0/19.0
+- ✅ Compatible with Odoo 16.0, 17.0, and 18.0
+- ✅ Enhanced UI and payment flow for Odoo 18.0
 - ✅ Firebase-based payment reconciliation
 - ✅ Environment variable configuration
 - ✅ Complete payment record creation
@@ -39,12 +40,16 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 
 ## **[0.2.0]** 11/04/2026
 ### Impacted Versions:
-- Odoo 17.0, 18.0, 19.0
+- Odoo 16.0, 17.0, 18.0, 19.0
 ### Changes:
-- Odoo 19.0 UI and payment flow enhancements
-- Payment line resend functionality
-- Improved line cleanup on screen exit
-- Documentation and manifest updated for Odoo 19.0 compatibility
+- Odoo 19.0 compatibility and enhancements.
+- Improved payment reconciliation logic.
+
+## **[0.1.5]** 21/07/2025
+### Impacted Versions:
+- Odoo 16.0, 17.0, 18.0
+### Changes:
+- Odoo 18.0 UI and payment flow enhancements
 
 ## **[0.1.3]** 07/07/2025
 ### Impacted Versions:
