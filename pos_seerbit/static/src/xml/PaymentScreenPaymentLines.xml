@@ -2,7 +2,7 @@
 <templates id="template" xml:space="preserve">
 
     <t t-name="pos_seerbit.PaymentScreenPaymentLinesInherited" t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension">
-        <xpath expr="//t[t-elif[contains(., 'waiting')]]" position="inside">
+        <xpath expr="//t[div[@class='electronic_status' and contains(., 'Request sent')]]/div[2]" position="inside">
             <div t-if="line.payment_status in ('waiting', 'waitingCard', 'waitingCapture')" class="button send_payment_request_resend highlight text-bg-primary" role="button" title="Resend Payment Request" t-on-click="() => this.props.sendPaymentRequest(line)">
                 Resend
             </div>
