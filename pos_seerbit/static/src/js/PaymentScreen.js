@@ -8,14 +8,19 @@ import { onWillUnmount } from '@odoo/owl';
 // Core PaymentScreen.sendPaymentRequest uses line.pay() → terminal.sendPaymentRequest → handlePaymentResponse.
 // Only extend what core does not do: Seerbit cleanup on force-done and when leaving the screen.
 
+/** @odoo-module **/
+
+import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
+import { patch } from '@web/core/utils/patch';
+import { onWillUnmount } from '@odoo/owl';
+
+// Odoo 19 wires terminals via register_payment_method → pos.payment.method.payment_terminal.
+// Core PaymentScreen.sendPaymentRequest uses line.pay() → terminal.sendPaymentRequest → handlePaymentResponse.
+// Only extend what core does not do: Seerbit cleanup on force-done and when leaving the screen.
+
 patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
-        // Ensure paymentTerminalInProgress is reset when the PaymentScreen is set up
-        // This handles cases where the flag might not have been reset on unmount
-        // or when navigating back to the screen.
-        this.pos.paymentTerminalInProgress = false;
-
         onWillUnmount(() => {
             this.paymentLines.forEach((line) => {
                 if (
@@ -27,6 +32,21 @@ patch(PaymentScreen.prototype, {
             });
             // Ensure paymentTerminalInProgress is reset when leaving the screen
             this.pos.paymentTerminalInProgress = false;
+        });
+
+        // New logic to resume reconciliation for pending Seerbit payment lines
+        this.paymentLines.forEach((line) => {
+            if (
+                line.payment_method_id?.use_payment_terminal === 'seerbit' &&
+                ['waiting', 'waitingCard', 'waitingCapture'].includes(line.payment_status)
+            ) {
+                // Set paymentTerminalInProgress to true to disable other payment methods
+                this.pos.paymentTerminalInProgress = true;
+                // Re-initiate the reconciliation listener by calling sendPaymentRequest
+                if (line.payment_method_id.payment_terminal) {
+                    line.payment_method_id.payment_terminal.sendPaymentRequest(line.uuid);
+                }
+            }
         });
     },
 
