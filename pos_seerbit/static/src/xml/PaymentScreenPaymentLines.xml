@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
-    <!-- Odoo 19: PaymentScreenPaymentLines is defined in core, no override needed -->
+    <t t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension">
+        <!-- Request sent: Resend for Seerbit (aborts in-flight listener then starts a new pay flow) -->
+        <xpath expr="//div[contains(@class,'electronic_status')][contains(., 'Request sent')]/following-sibling::div[1]/i[@role='img']" position="after">
+            <div
+                t-if="this.props.resendPaymentRequest and line.payment_method_id.use_payment_terminal === 'seerbit' and line.payment_status === 'waiting'"
+                class="button send_payment_request highlight text-bg-secondary mt-2"
+                role="button"
+                title="Resend payment request"
+                t-on-click="() => this.props.resendPaymentRequest(line)"
+            >
+                Resend
+            </div>
+        </xpath>
+    </t>
 </templates>
