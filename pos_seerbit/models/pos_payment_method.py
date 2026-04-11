@@ -175,15 +175,14 @@ def send_to_firestore_transactions(env, payload):
         return _send_to_fallback(env, firestore_payload)
 
     try:
-
-            
-        _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
-        _logger.info('Payload sent: %s', pprint.pformat(firestore_payload))        
+        _logger.info('Sending payment request to Firestore: %s', pprint.pformat(payload))
         db = firestore.client()
         doc_ref = db.collection('transactions').document()
         doc_ref.set(firestore_payload)
         _logger.info(
-            'Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id
+            'Sent payment request to Firestore successfully. Document ID: %s. Payload: %s',
+            doc_ref.id,
+            pprint.pformat(firestore_payload),
         )
         return True
     except Exception as e:
