@@ -214,22 +214,23 @@ export default class SeerbitPayment extends PaymentInterface {
                 });
             })
             .catch(async function (error) {
-                console.error('[Seerbit] Payment / reconciliation failed:', error);
                 const line = self._getActiveSeerbitLine(lineUuid);
-                if (error && error.message === 'cancelled') {
-                    if (line) {
+                const msg = error && error.message;
+                // User removed line / cancelled terminal — must resolve (false), not reject, or line.pay() throws.
+                if (msg === 'cancelled') {
+                    if (line && line.getPaymentStatus && line.getPaymentStatus() !== 'waitingCancel') {
                         line.setPaymentStatus('waitingCancel');
                     }
-                    throw error;
+                    return false;
                 }
+                console.error('[Seerbit] Payment / reconciliation failed:', error);
                 if (line) {
                     line.setPaymentStatus('retry');
                 }
                 await self.env.services.dialog.add(AlertDialog, {
                     title: _t('Seerbit'),
                     body:
-                        (error && error.message) ||
-                        _t('Could not confirm payment. You can retry or force done if the customer paid.'),
+                        msg || _t('Could not confirm payment. You can retry or force done if the customer paid.'),
                 });
                 return false;
             })
