@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
 
-    <t t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension">
-        <xpath expr="//t[t-elif=\"['waiting', 'waitingCancel', 'waitingCapture'].includes(line.payment_status)\"]//div[@class='button send_force_done']" position="before">
-            <div t-if="line.payment_status == 'waiting'" class="button send_payment_request_resend highlight text-bg-primary" role="button" title="Resend Payment Request" t-on-click="() => this.props.sendPaymentRequest(line)">
+    <t t-extend="point_of_sale.PaymentScreenPaymentLines">
+        <t t-jquery="t-elif[contains(., 'waiting')] .button.send_force_done" t-operation="before">
+            <div t-if="line.payment_status in ('waiting', 'waitingCard', 'waitingCapture')" class="button send_payment_request_resend highlight text-bg-primary" role="button" title="Resend Payment Request" t-on-click="() => this.props.sendPaymentRequest(line)">
                 Resend
             </div>
-        </xpath>
+        </t>
     </t>
 
 </templates>
