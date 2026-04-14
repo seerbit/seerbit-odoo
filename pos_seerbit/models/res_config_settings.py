@@ -75,6 +75,7 @@ class ResConfigSettings(models.TransientModel):
         super().set_values()
         
         # Save Firestore configuration to ir.config_parameter
+        # Odoo 19: New API with default parameter support
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firestore_cred', self.seerbit_firestore_cred or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firestore_project_id', self.seerbit_firestore_project_id or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_api_key', self.seerbit_firebase_api_key or '')
@@ -89,6 +90,7 @@ class ResConfigSettings(models.TransientModel):
         """Load configuration values from system parameters"""
         res = super().get_values()
         res.update(
+            # Odoo 19: New API with default parameter support
             seerbit_firestore_cred=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firestore_cred', default=''),
             seerbit_firestore_project_id=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firestore_project_id', default=''),
             seerbit_firebase_api_key=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_api_key', default=''),

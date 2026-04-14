@@ -116,8 +116,8 @@ def post_init_hook(env):
             if os.path.exists(logo_path):
                 try:
                     with open(logo_path, 'rb') as f:
-                        image_data = base64.b64encode(f.read())
-                        payment_method.write({'image_128': image_data})
+                        # Odoo 19: Binary fields now use BinaryValue objects - no need for base64 encoding
+                        payment_method.write({'image_128': f.read()})
                     _logger.info("Set Seerbit payment method logo")
                 except Exception as e:
                     _logger.warning("Failed to set payment method logo: %s", str(e))

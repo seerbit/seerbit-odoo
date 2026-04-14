@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Seerbit Odoo Point of Sale",
-    "version": "0.1.5",
+    "version": "0.2.0",
     "category": "Sales/Point of Sale",
     "summary": "Integrate your POS with a Seerbit payment terminal with real-time payment and reconciliation.",
     "description": """
@@ -15,7 +15,7 @@
         - Configurable through Odoo settings
         
         # Compatibility:
-        - Odoo 17.0, 18.0
+        - Odoo 17.0, 18.0, 19.0
     """,
     "author": "Seerbit",
     "website": "https://github.com/seerbit/seerbit-odoo",
@@ -33,7 +33,6 @@
     "application": False,
     "post_init_hook": "post_init_hook",
     "assets": {
-        # All assets loaded in backend to ensure availability
         "web.assets_backend": [
             "pos_seerbit/static/lib/firestore/firebase-app-compat.js",
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
@@ -44,8 +43,8 @@
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
             "pos_seerbit/static/src/js/models.js",
             "pos_seerbit/static/src/js/firebase_init.js",
-            "pos_seerbit/static/src/js/PaymentScreen.js",
             "pos_seerbit/static/src/js/payment_seerbit.js",
+            "pos_seerbit/static/src/js/PaymentScreen.js",
             "pos_seerbit/static/src/js/firebase_listener.js",
             "pos_seerbit/static/src/scss/pos.scss",
             "pos_seerbit/static/src/xml/PaymentScreenPaymentLines.xml",

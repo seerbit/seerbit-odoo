@@ -10,9 +10,9 @@
 An Odoo Integration for Seerbit POS Terminal 
 </h2>
 
-## Version: 0.1.5
+## Version: 0.2.0
 
-> **Note:** As of v0.1.5, this module is compatible with Odoo 16.0, 17.0, and 18.0. It uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
+> **Note:** As of v0.2.0, this module is compatible with Odoo 16.0, 17.0, 18.0, and 19.0. It uses Firebase Realtime Database for payment requests and reconciliation, replacing the previous webhook-based approach. 
 
 ## How to Use
 
@@ -23,6 +23,7 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 - **Odoo 16.0**
 - **Odoo 17.0**
 - **Odoo 18.0** 
+- **Odoo 19.0** 
 
 ## Features
 
@@ -37,12 +38,18 @@ A user guide is available [here](https://apps.odoo.com/apps/modules/16.0/pos_see
 
 ## Version History
 
+## **[0.2.0]** 11/04/2026
+### Impacted Versions:
+- Odoo 16.0, 17.0, 18.0, 19.0
+### Changes:
+- Odoo 19.0 compatibility and enhancements.
+- Improved payment reconciliation logic.
+
 ## **[0.1.5]** 21/07/2025
 ### Impacted Versions:
 - Odoo 16.0, 17.0, 18.0
 ### Changes:
 - Odoo 18.0 UI and payment flow enhancements
-- Documentation and manifest updated for Odoo 18.0 compatibility
 
 ## **[0.1.3]** 07/07/2025
 ### Impacted Versions:
