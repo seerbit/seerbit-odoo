@@ -160,11 +160,15 @@ class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
     
+    def _default_seerbit_public_key(self):
+        return self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_public_key', default='')
+
     # Seerbit Fields
     seerbit_public_key = fields.Char(
         string="Seerbit Public Key", 
         help="As provided on Seerbit dashboard", 
-        copy=False
+        copy=False,
+        default=_default_seerbit_public_key
     )
     seerbit_terminal_id = fields.Char(
         string="Seerbit Terminal ID", 

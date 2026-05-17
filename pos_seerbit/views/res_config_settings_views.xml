@@ -15,6 +15,12 @@
                                     Enable Seerbit payment terminal integration.
                                 </div>
                             </setting>
+                            <setting string="Seerbit Public Key" invisible="not module_pos_seerbit">
+                                <field name="seerbit_public_key" placeholder="YOUR_PUBLIC_KEY"/>
+                            </setting>
+                            <setting string="Seerbit Secret Key" invisible="not module_pos_seerbit">
+                                <field name="seerbit_secret_key" placeholder="YOUR_SECRET_KEY"/>
+                            </setting>
                             <setting string="Seerbit Firebase API Key" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firebase_api_key" placeholder="AIzaSy..."/>
                             </setting>

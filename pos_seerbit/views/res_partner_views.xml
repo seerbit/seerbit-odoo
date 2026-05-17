@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_seerbit_inherit" model="ir.ui.view">
+        <field name="name">res.partner.form.seerbit.inherit</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button" type="object" name="action_create_seerbit_va" icon="fa-bank" invisible="seerbit_va_account_number">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Create VA</span>
+                    </div>
+                </button>
+                <button class="oe_stat_button" type="action" icon="fa-money" invisible="not seerbit_va_account_number">
+                    <div class="o_stat_info">
+                        <span class="o_stat_value"><field name="seerbit_va_balance"/></span>
+                        <span class="o_stat_text">VA Balance</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Seerbit Virtual Account">
+                    <group>
+                        <group>
+                            <field name="seerbit_va_name"/>
+                            <field name="seerbit_va_bank_name"/>
+                        </group>
+                        <group>
+                            <field name="seerbit_va_account_number"/>
+                            <field name="seerbit_va_reference"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
