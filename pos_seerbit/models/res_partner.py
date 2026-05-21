@@ -27,12 +27,16 @@ class ResPartner(models.Model):
                 domain = [
                     ('partner_id', '=', partner.id),
                     ('payment_type', '=', 'inbound'),
-                    ('state', '=', 'posted'),
-                    ('is_reconciled', '=', False)
+                    ('state', 'in', ['in_process', 'paid']),
                 ]
                 payments = self.env['account.payment'].search(domain)
                 # We consider the residual amount (unallocated portion) as the VA balance
-                balance = sum(payments.mapped('amount_residual'))
+                for payment in payments:
+                    receivable_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable')
+                    if receivable_lines:
+                        balance += sum(abs(l.amount_residual) for l in receivable_lines)
+                    else:
+                        balance += payment.amount
             partner.seerbit_va_balance = balance
 
     @api.model_create_multi
@@ -126,39 +130,77 @@ class ResPartner(models.Model):
         if not partners:
             return
             
-        # Get Payment using account number
-        # URL: https://seerbitapi.com/api/v2/virtual-accounts/YOUR_PUBLIC_KEY/{{accountNumber}}
         from ..services.seerbit_api import SeerbitAPI
         api_client = SeerbitAPI(self.env)
         
-        import requests
-        headers = {
-            'Authorization': f'Bearer {api_client.secret_key}'
-        }
-        
         for partner in partners:
-            url = f'https://seerbitapi.com/api/v2/virtual-accounts/{api_client.public_key}/{partner.seerbit_va_account_number}'
             try:
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    res_data = response.json()
-                    if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
-                        payload = res_data['data'].get('payload', [])
-                        for payment in payload:
-                            # Verify if payment is already processed in Odoo
-                            # We can use paymentReference or internalreference as memo/ref
-                            ref = payment.get('paymentReference')
-                            amount = payment.get('amount')
-                            
-                            existing_payment = self.env['account.payment'].search([
-                                ('ref', '=', ref)
-                            ], limit=1)
-                            
-                            if not existing_payment and amount:
-                                _logger.info(f"Cron: Found missing payment {ref} for {partner.name}. Processing...")
-                                self._process_seerbit_va_payment(partner, amount, ref)
+                partner._fetch_and_process_va_payments(api_client)
             except Exception as e:
                 _logger.error(f"Error spooling payments for VA {partner.seerbit_va_account_number}: {e}")
+
+    def _fetch_and_process_va_payments(self, api_client):
+        self.ensure_one()
+        import requests
+        headers = api_client._get_headers()
+        url = f'https://seerbitapi.com/api/v2/virtual-accounts/{api_client.public_key}/{self.seerbit_va_account_number}'
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
+        if response.status_code == 200:
+            res_data = response.json()
+            if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
+                payload = res_data['data'].get('payload', [])
+                for payment in payload:
+                    if payment.get('gatewayCode') != '00':
+                        _logger.info(f"Skipping payment {payment.get('paymentReference')} due to gatewayCode {payment.get('gatewayCode')}")
+                        continue
+                        
+                    ref = payment.get('paymentReference')
+                    amount = payment.get('amount')
+                    
+                    existing_payment = self.env['account.payment'].search([
+                        ('move_id.ref', '=', ref)
+                    ], limit=1)
+                    
+                    if existing_payment:
+                        if existing_payment.state == 'draft':
+                            _logger.info(f"Found existing pending payment {ref} for {self.name}. Posting it...")
+                            existing_payment.action_post()
+                        if existing_payment.state == 'in_process':
+                            self._reconcile_seerbit_payment(existing_payment)
+                    elif amount:
+                        _logger.info(f"Found missing payment {ref} for {self.name}. Processing...")
+                        self._process_seerbit_va_payment(self, amount, ref)
+        else:
+            raise Exception(f"Seerbit API returned status code {response.status_code}")
+
+    def action_refresh_seerbit_va_balance(self):
+        self.ensure_one()
+        if not self.seerbit_va_account_number:
+            raise UserError(_("No Virtual Account configured for this customer."))
+            
+        from ..services.seerbit_api import SeerbitAPI
+        api_client = SeerbitAPI(self.env)
+        
+        try:
+            self._fetch_and_process_va_payments(api_client)
+        except Exception as e:
+            raise UserError(_("Error refreshing balance: %s" % str(e)))
+
+    def action_view_seerbit_va_balance(self):
+        self.ensure_one()
+        return {
+            'name': _('Virtual Account Payments'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.payment',
+            'view_mode': 'list,form',
+            'domain': [('partner_id', '=', self.id)],
+            'context': {
+                'default_partner_id': self.id,
+                'default_payment_type': 'inbound',
+            }
+        }
 
     def _process_seerbit_va_payment(self, partner, amount, reference):
         """Processes a VA payment: creates payment, reconciles oldest invoices."""
@@ -176,11 +218,12 @@ class ResPartner(models.Model):
             'amount': float(amount),
             'journal_id': journal.id,
             'payment_method_line_id': journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_method_id == payment_method)[:1].id or journal.inbound_payment_method_line_ids[:1].id,
-            'ref': reference,
+            'memo': reference,
         }
         
         payment = self.env['account.payment'].create(payment_vals)
         payment.action_post()
+        self._reconcile_seerbit_payment(payment)
         
         # Settle oldest invoices
         invoices = self.env['account.move'].search([
@@ -190,7 +233,7 @@ class ResPartner(models.Model):
             ('payment_state', 'in', ['not_paid', 'partial'])
         ], order='invoice_date asc, id asc')
         
-        payment_lines = payment.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+        payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
         
         for invoice in invoices:
             if not payment_lines:
@@ -198,4 +241,27 @@ class ResPartner(models.Model):
             invoice_lines = invoice.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
             if invoice_lines:
                 (payment_lines + invoice_lines).reconcile()
-                payment_lines = payment.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+                payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+
+    def _reconcile_seerbit_payment(self, payment):
+        """Automatically creates a bank statement line and reconciles it with the payment, forcing the payment to 'Paid'."""
+        if payment.state != 'in_process':
+            return
+            
+        liquidity_lines, _, _ = payment._seek_for_lines()
+        if not liquidity_lines:
+            return
+            
+        st_line = self.env['account.bank.statement.line'].create({
+            'payment_ref': payment.memo or 'Seerbit Auto Sync',
+            'journal_id': payment.journal_id.id,
+            'amount': payment.amount if payment.payment_type == 'inbound' else -payment.amount,
+            'date': payment.date,
+            'partner_id': payment.partner_id.id,
+        })
+        
+        suspense_line = st_line.move_id.line_ids.filtered(lambda l: l.account_id == st_line.journal_id.suspense_account_id)
+        if suspense_line and liquidity_lines:
+            # Change the suspense line's account to the liquidity line's account
+            suspense_line.account_id = liquidity_lines.account_id.id
+            (suspense_line + liquidity_lines).reconcile()

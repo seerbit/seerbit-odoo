@@ -11,7 +11,7 @@
                         <span class="o_stat_text">Create VA</span>
                     </div>
                 </button>
-                <button class="oe_stat_button" type="action" icon="fa-money" invisible="not seerbit_va_account_number">
+                <button class="oe_stat_button" type="object" name="action_view_seerbit_va_balance" icon="fa-money" invisible="not seerbit_va_account_number">
                     <div class="o_stat_info">
                         <span class="o_stat_value"><field name="seerbit_va_balance"/></span>
                         <span class="o_stat_text">VA Balance</span>
@@ -20,6 +20,9 @@
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Seerbit Virtual Account">
+                    <div class="oe_button_box" name="seerbit_button_box">
+                        <button name="action_refresh_seerbit_va_balance" type="object" string="Refresh VA Balance" class="oe_stat_button" icon="fa-refresh" invisible="not seerbit_va_account_number"/>
+                    </div>
                     <group>
                         <group>
                             <field name="seerbit_va_name"/>

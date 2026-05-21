@@ -8,6 +8,7 @@
             <xpath expr="//header" position="inside">
                 <button name="action_sync_seerbit_invoice" type="object" string="Sync with Seerbit" class="oe_highlight" invisible="state != 'posted' or synced_with_seerbit"/>
                 <button name="action_check_seerbit_status" type="object" string="Check Seerbit Status" invisible="not synced_with_seerbit"/>
+                <button name="action_sync_seerbit_invoice" type="object" string="Update Seerbit" invisible="not synced_with_seerbit"/>
                 <button name="action_send_payment_to_pos" type="object" string="Send Payment to POS" invisible="state != 'posted' or payment_state in ('in_payment', 'paid')"/>
             </xpath>
             <xpath expr="//group[@id='header_right_group']" position="inside">

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_seerbit.InvoicePaymentListener">
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(8, 8, 16, 0.85); backdrop-filter: blur(12px); z-index: 999999;">
+            <div class="d-flex flex-column align-items-center justify-content-center p-5 text-center bg-view border rounded shadow-lg animate__animated animate__fadeInUp" style="max-width: 500px; background: linear-gradient(135deg, #1e1e2e 0%, #11111b 100%); color: #cdd6f4; border: 1px solid rgba(255, 255, 255, 0.08) !important; font-family: 'Outfit', 'Inter', sans-serif; border-radius: 20px !important;">
+                
+                <style>
+                    @keyframes ping {
+                        0% {
+                            transform: scale(1);
+                            opacity: 0.35;
+                        }
+                        70%, 100% {
+                            transform: scale(2.2);
+                            opacity: 0;
+                        }
+                    }
+                    @keyframes bounceIn {
+                        from, 20%, 40%, 60%, 80%, to {
+                            animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+                        }
+                        0% {
+                            opacity: 0;
+                            transform: scale3d(0.3, 0.3, 0.3);
+                        }
+                        20% {
+                            transform: scale3d(1.1, 1.1, 1.1);
+                        }
+                        40% {
+                            transform: scale3d(0.9, 0.9, 0.9);
+                        }
+                        60% {
+                            opacity: 1;
+                            transform: scale3d(1.03, 1.03, 1.03);
+                        }
+                        80% {
+                            transform: scale3d(0.97, 0.97, 0.97);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: scale3d(1, 1, 1);
+                        }
+                    }
+                    @keyframes shakeX {
+                        from, to {
+                            transform: translate3d(0, 0, 0);
+                        }
+                        10%, 30%, 50%, 70%, 90% {
+                            transform: translate3d(-10px, 0, 0);
+                        }
+                        20%, 40%, 60%, 80% {
+                            transform: translate3d(10px, 0, 0);
+                        }
+                    }
+                    .animate-ping-custom {
+                        animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+                    }
+                    .animate-bounce-custom {
+                        animation: bounceIn 0.8s both;
+                    }
+                    .animate-shake-custom {
+                        animation: shakeX 0.6s both;
+                    }
+                </style>
+
+                <div class="mb-4">
+                    <t t-if="state.status === 'waiting'">
+                        <!-- Stunning Animated Pulse Loader -->
+                        <div class="position-relative d-flex align-items-center justify-content-center" style="width: 100px; height: 100px;">
+                            <div class="position-absolute rounded-circle bg-primary opacity-25 animate-ping-custom" style="width: 100%; height: 100%;"></div>
+                            <div class="position-absolute rounded-circle bg-primary opacity-50 animate-ping-custom" style="width: 75%; height: 75%; animation-delay: 0.6s;"></div>
+                            <div class="position-relative rounded-circle d-flex align-items-center justify-content-center shadow-lg" style="width: 60px; height: 60px; background: linear-gradient(135deg, #89b4fa 0%, #b4befe 100%) !important;">
+                                <i class="fa fa-refresh fa-spin text-white fa-2x"></i>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-elif="state.status === 'success'">
+                        <!-- Success Animation -->
+                        <div class="rounded-circle d-flex align-items-center justify-content-center shadow-lg animate-bounce-custom" style="width: 80px; height: 80px; background: linear-gradient(135deg, #a6e3a1 0%, #40a02b 100%); border: 3px solid rgba(255, 255, 255, 0.2);">
+                            <i class="fa fa-check text-white fa-3x"></i>
+                        </div>
+                    </t>
+                    <t t-elif="state.status === 'error'">
+                        <!-- Error Animation -->
+                        <div class="rounded-circle d-flex align-items-center justify-content-center shadow-lg animate-shake-custom" style="width: 80px; height: 80px; background: linear-gradient(135deg, #f38ba8 0%, #d20f39 100%); border: 3px solid rgba(255, 255, 255, 0.2);">
+                            <i class="fa fa-times text-white fa-3x"></i>
+                        </div>
+                    </t>
+                </div>
+                
+                <h3 class="fw-bold mb-3" style="background: linear-gradient(90deg, #cdd6f4, #89b4fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.5rem; letter-spacing: -0.5px;">
+                    Seerbit POS Payment
+                </h3>
+                
+                <div class="card p-3 mb-4 w-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px;">
+                    <p class="mb-0 text-muted" style="font-size: 1.05rem; color: #a6adc8 !important; line-height: 1.5;">
+                        <t t-out="state.message"/>
+                    </p>
+                </div>
+                
+                <t t-if="state.status === 'waiting'">
+                    <button class="btn btn-primary btn-lg w-100 py-2 mb-3 shadow-sm" t-on-click="onResend" style="background: linear-gradient(135deg, #89b4fa 0%, #30b0e9 100%); border: none; font-weight: 600; font-size: 1.1rem; border-radius: 10px; transition: all 0.2s ease; position: relative; z-index: 1000000; pointer-events: auto;">
+                        <i class="oi oi-sync me-2"/> Resend Payment
+                    </button>
+                </t>
+                
+                <button class="btn btn-danger btn-lg w-100 py-2 shadow-sm" t-on-click="onCancel" style="background: linear-gradient(135deg, #f38ba8 0%, #d20f39 100%); border: none; font-weight: 600; font-size: 1.1rem; border-radius: 10px; transition: all 0.2s ease; position: relative; z-index: 1000000; pointer-events: auto;">
+                    Cancel Payment
+                </button>
+            </div>
+        </div>
+    </t>
+</templates>

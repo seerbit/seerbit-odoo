@@ -6,9 +6,13 @@ import random
 import string
 import warnings
 import sys
+import requests
+import threading
 
 # Set up logging first
 _logger = logging.getLogger(__name__)
+
+FALLBACK_ENDPOINT = "https://posnotification.seerbitapi.com/"
 
 # Suppress all warnings from firebase_admin before importing
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -47,6 +51,9 @@ from odoo.addons.pos_seerbit.utils import format_erp_ref
 
 # Initialize Firestore only once
 _firestore_initialized = False
+
+# Persistent HTTP Session Pool for rapid Seerbit requests
+_session = None
 
 def initialize_firestore(env):
     """Initialize Firestore with proper error handling"""
@@ -107,68 +114,191 @@ def initialize_firestore(env):
         _logger.warning("Failed to initialize Firestore: %s", str(e))
         return False
 
-# Firestore initialization is deferred until first use
-# when a payment method is accessed
+
+# -------------------------------------------------------
+#       FALLBACK METHOD FOR API SEND
+# -------------------------------------------------------    
+
+def _send_to_fallback(payload):
+    """
+    POST JSON payload to fallback endpoint when Firestore is unavailable.
+    """
+    try:
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(FALLBACK_ENDPOINT, json=payload, headers=headers, timeout=30)
+
+        if response.status_code in (200, 201):
+            _logger.info("Payload sent to fallback endpoint successfully: %s", payload.get('id'))
+            return True
+        else:
+            _logger.warning(
+                "Fallback endpoint returned error %s: %s",
+                response.status_code, response.text
+            )
+            return False
+    except requests.exceptions.ReadTimeout:
+        _logger.warning("Fallback endpoint timed out for transaction ID: %s", payload.get('id'))
+        return False
+    except Exception as e:
+        _logger.warning("Failed to send to fallback endpoint: %s", str(e))
+        return False
+
+def _sync_firestore_or_fallback(firestore_payload):
+    """
+    Core logic to send to Firestore, or fallback to HTTP.
+    Runs inside the thread so it can be monitored with a timeout.
+    """
+    # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
+    if FIRESTORE_AVAILABLE and _firestore_initialized:
+        try:
+            _logger.info('Sending payment request to Firestore: %s', firestore_payload.get('id'))
+            
+            # Get Firestore client
+            db = firestore.client()
+            
+            # Add to transactions collection
+            doc_ref = db.collection('transactions').document()
+            doc_ref.set(firestore_payload)
+            
+            _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
+            return True
+        except Exception as e:
+            _logger.error("Failed to send payment request to Firestore: %s", str(e))
+            _logger.warning("Falling back to endpoint...")
+            return _send_to_fallback(firestore_payload)
+    # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
+    else:
+        _logger.warning("Firestore SDK not initialized. Using fallback endpoint...")
+        return _send_to_fallback(firestore_payload)
+
+def send_to_firestore_transactions(env, payload):
+    """
+    Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
+    If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
+    
+    Waits synchronously for up to 5 seconds. If the process exceeds 5 seconds,
+    it detaches and lets the transmission finish in the background.
+    """
+    # Initialize firestore dynamically (synchronous, uses Odoo env cursor safely)
+    initialize_firestore(env)
+    
+    # Ensure all values are stringified and add server timestamp
+    firestore_payload = {
+        'id': str(payload.get('id', '')),
+        'posid': str(payload.get('posid', '')),
+        'merchantid': str(payload.get('merchantid', "")),
+        'metadata': str(payload.get('metadata', '')),
+        'transactionValue': str(payload.get('transactionValue', '')),
+        'status': str(payload.get('status', '')),
+        'transactionTime': str(payload.get('transactionTime', '')),
+        'sessionId': str(payload.get('sessionId', '')),
+        'receivedDateTime': str(payload.get('receivedDateTime', '')),
+        'transactionRef': str(payload.get('transactionRef', '')),
+        'pubkey': str(payload.get('pubkey', '')),
+    }
+    
+    # Spawn thread to handle network calls
+    thread = threading.Thread(
+        target=_sync_firestore_or_fallback,
+        args=(firestore_payload,),
+        daemon=True
+    )
+    thread.start()
+    
+    # Wait synchronously for up to 5 seconds
+    thread.join(timeout=5.0)
+    
+    if thread.is_alive():
+        _logger.warning(
+            "Payment request transmission exceeded 5 seconds. "
+            "Detaching and continuing in the background for transaction ID: %s", 
+            firestore_payload.get('id')
+        )
+        # Thread continues running in background safely
+        return True
+        
+    return True
+    """
+    POST JSON payload to fallback endpoint when Firestore is unavailable.
+    """
+    try:
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(FALLBACK_ENDPOINT, json=payload, headers=headers, timeout=30)
+
+        if response.status_code in (200, 201):
+            _logger.info("Payload sent to fallback endpoint successfully: %s", payload.get('id'))
+            return True
+        else:
+            _logger.warning(
+                "Fallback endpoint returned error %s: %s",
+                response.status_code, response.text
+            )
+            return False
+    except requests.exceptions.ReadTimeout:
+        _logger.warning("Fallback endpoint timed out for transaction ID: %s", payload.get('id'))
+        return False
+    except Exception as e:
+        _logger.warning("Failed to send to fallback endpoint: %s", str(e))
+        return False
 
 
 def send_to_firestore_transactions(env, payload):
     """
-    Send payment request to Firestore.
+    Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
+    If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
     """
-    # Check if Firestore is available
-    if not FIRESTORE_AVAILABLE:
-        _logger.warning("Firebase Admin SDK not available. Cannot send payment request.")
-        return False
+    # Initialize firestore dynamically
+    initialize_firestore(env)
     
-    if not initialize_firestore(env):
-        _logger.warning("Firestore not initialized. Cannot send payment request.")
-        return False
+    # Ensure all values are stringified and add server timestamp
+    firestore_payload = {
+        'id': str(payload.get('id', '')),
+        'posid': str(payload.get('posid', '')),
+        'merchantid': str(payload.get('merchantid', "")),
+        'metadata': str(payload.get('metadata', '')),
+        'transactionValue': str(payload.get('transactionValue', '')),
+        'status': str(payload.get('status', '')),
+        'transactionTime': str(payload.get('transactionTime', '')),
+        'sessionId': str(payload.get('sessionId', '')),
+        'receivedDateTime': str(payload.get('receivedDateTime', '')),
+        'transactionRef': str(payload.get('transactionRef', '')),
+        'pubkey': str(payload.get('pubkey', '')),
+    }
     
-    try:
-        _logger.info('Sending payment request to Firestore for transaction ID: %s', payload.get('id', 'unknown'))
-        
-        # Get Firestore client
-        db = firestore.client()
-        
-        # Ensure all values are stringified and add server timestamp
-        firestore_payload = {
-            'id': str(payload.get('id', '')),
-            'posid': str(payload.get('posid', '')),
-            'merchantid': str(payload.get('merchantid', "")),
-            'metadata': str(payload.get('metadata', '')),
-            'transactionValue': str(payload.get('transactionValue', '')),
-            'status': str(payload.get('status', '')),
-            'transactionTime': str(payload.get('transactionTime', '')),
-            'sessionId': str(payload.get('sessionId', '')),
-            'receivedDateTime': str(payload.get('receivedDateTime', '')),
-            'transactionRef': str(payload.get('transactionRef', '')),
-            'pubkey': str(payload.get('pubkey', '')),
-        }
-        
-        # Add to transactions collection
-        doc_ref = db.collection('transactions').document()
-        doc_ref.set(firestore_payload)
-        
-        _logger.info('Payment request sent to Firestore successfully. Document ID: %s', doc_ref.id)
-        return True
-    except Exception as e:
-        _logger.error("Failed to send payment request to Firestore: %s", str(e))
-        return False
+    # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
+    if FIRESTORE_AVAILABLE and _firestore_initialized:
+        try:
+            _logger.info('Sending payment request to Firestore: %s', firestore_payload.get('id'))
+            
+            # Get Firestore client
+            db = firestore.client()
+            
+            # Add to transactions collection
+            doc_ref = db.collection('transactions').document()
+            doc_ref.set(firestore_payload)
+            
+            _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
+            return True
+        except Exception as e:
+            _logger.error("Failed to send payment request to Firestore: %s", str(e))
+            _logger.warning("Falling back to endpoint...")
+            return _send_to_fallback(firestore_payload)
+    # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
+    else:
+        _logger.warning("Firestore SDK not initialized. Using fallback endpoint...")
+        return _send_to_fallback(firestore_payload)
+
 
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
     
-    def _default_seerbit_public_key(self):
-        return self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_public_key', default='')
-
     # Seerbit Fields
     seerbit_public_key = fields.Char(
         string="Seerbit Public Key", 
         help="As provided on Seerbit dashboard", 
-        copy=False,
-        default=_default_seerbit_public_key
+        copy=False
     )
     seerbit_terminal_id = fields.Char(
         string="Seerbit Terminal ID", 

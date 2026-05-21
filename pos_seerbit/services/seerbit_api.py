@@ -14,13 +14,40 @@ class SeerbitAPI:
         # Get Public Key from config
         self.public_key = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_public_key', default='')
         
+        self._encrypted_key = None
+        
         if not self.secret_key or not self.public_key:
             _logger.warning("Seerbit Secret Key or Public Key is not configured.")
+
+    def _get_encrypted_key(self):
+        if self._encrypted_key:
+            return self._encrypted_key
+            
+        if not self.secret_key or not self.public_key:
+             raise UserError("Seerbit keys are missing. Please configure them in Settings.")
+
+        url = 'https://seerbitapi.com/api/v2/encrypt/keys'
+        payload = {
+            "key": f"{self.secret_key}.{self.public_key}"
+        }
+        try:
+            response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=10)
+            response.raise_for_status()
+            res_data = response.json()
+            if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
+                data = res_data['data']
+                if 'EncryptedSecKey' in data and 'encryptedKey' in data['EncryptedSecKey']:
+                    self._encrypted_key = data['EncryptedSecKey']['encryptedKey']
+                    return self._encrypted_key
+            raise UserError("Failed to parse encrypted key from Seerbit response")
+        except Exception as e:
+            _logger.error(f"Seerbit Encrypt Key Error: {e}")
+            raise UserError(f"Failed to authenticate with Seerbit: {str(e)}")
 
     def _get_headers(self):
         return {
             'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.secret_key}'
+            'Authorization': f'Bearer {self._get_encrypted_key()}'
         }
 
     # Virtual Accounts
@@ -38,11 +65,14 @@ class SeerbitAPI:
         
         try:
             response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+            _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
             if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
                 return res_data['data']
             raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+        except UserError:
+            raise
         except Exception as e:
             _logger.error(f"Seerbit Create VA Error: {e}")
             raise UserError(f"Failed to create Virtual Account: {str(e)}")
@@ -51,6 +81,7 @@ class SeerbitAPI:
         url = f'https://seerbitapi.com/api/v2/virtual-accounts/{reference}'
         try:
             response = requests.delete(url, headers=self._get_headers(), timeout=10)
+            _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -72,11 +103,14 @@ class SeerbitAPI:
         
         try:
             response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+            _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
             if res_data.get('code') == '00':
                 return res_data['payload']
             raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+        except UserError:
+            raise
         except Exception as e:
             _logger.error(f"Seerbit Create Invoice Error: {e}")
             raise UserError(f"Failed to create Seerbit Invoice: {str(e)}")
@@ -85,6 +119,7 @@ class SeerbitAPI:
         url = f'https://merchant.seerbitapi.com/invoice/{self.public_key}/{invoice_no}'
         try:
             response = requests.get(url, headers=self._get_headers(), timeout=10)
+            _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
             if res_data.get('code') == '00':
@@ -92,12 +127,40 @@ class SeerbitAPI:
             return False
         except Exception as e:
             _logger.error(f"Seerbit Get Invoice Error: {e}")
-            return False
+            return None
+
+    def send_invoice(self, invoice_no):
+        """
+        Triggers Seerbit to send the invoice to the customer's email.
+        """
+        if not self.public_key:
+            raise UserError("Seerbit Public Key is not configured. Please check your POS settings.")
+            
+        url = f"{self.base_url}/invoice/{self.public_key}/send/{invoice_no}"
+        
+        try:
+            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
+            
+            response.raise_for_status()
+            res_data = response.json()
+            
+            if res_data.get('status') == 'SUCCESS' or res_data.get('code') == '00':
+                return True
+                
+            raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+            
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.error(f"Seerbit Send Invoice Error: {e}")
+            raise UserError(f"Failed to send Seerbit Invoice: {str(e)}")
 
     def delete_invoice(self, invoice_no):
         url = f'https://merchant.seerbitapi.com/invoice/{self.public_key}/{invoice_no}'
         try:
             response = requests.delete(url, headers=self._get_headers(), timeout=10)
+            _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             return True
         except Exception as e:

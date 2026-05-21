@@ -10,33 +10,22 @@ class AccountMove(models.Model):
     synced_with_seerbit = fields.Boolean(string='Synced with Seerbit', default=False, copy=False)
     seerbit_invoice_no = fields.Char(string='Seerbit Invoice No', copy=False, readonly=True)
     seerbit_invoice_status = fields.Char(string='Seerbit Status', copy=False, readonly=True)
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        moves = super(AccountMove, self).create(vals_list)
-        return moves
+    seerbit_terminal_id = fields.Char(string='Seerbit Terminal ID', copy=False)
 
     def action_post(self):
-        res = super(AccountMove, self).action_post()
-        for move in self:
-            if move.move_type == 'out_invoice' and move.partner_id and not move.synced_with_seerbit:
-                try:
-                    move.action_sync_seerbit_invoice()
-                except Exception as e:
-                    _logger.warning(f"Auto-sync Seerbit Invoice failed for {move.name}: {e}")
+        res = super().action_post()
+        for move in self.filtered(lambda m: m.synced_with_seerbit and m.seerbit_invoice_no and m.move_type == 'out_invoice'):
+            from ..services.seerbit_api import SeerbitAPI
+            api_client = SeerbitAPI(self.env)
+            existing_invoice = api_client.get_invoice(move.seerbit_invoice_no)
+            if existing_invoice:
+                status = existing_invoice.get('status', '').upper()
+                if status in ['PAID', 'SUCCESS']:
+                    remote_amount = existing_invoice.get('amount') or existing_invoice.get('transactionValue') or existing_invoice.get('RequestedAmount')
+                    if remote_amount is not None and round(float(remote_amount), 2) != round(move.amount_total, 2):
+                        raise UserError(_("This invoice was modified to %s, but it has already been PAID on Seerbit for %s. Please revert your changes and create a new invoice for any discrepancies.") % (move.amount_total, remote_amount))
         return res
 
-    def write(self, vals):
-        res = super(AccountMove, self).write(vals)
-        # Rerun invoice creation if items change
-        if 'invoice_line_ids' in vals or 'line_ids' in vals:
-            for move in self:
-                if move.synced_with_seerbit and move.state == 'posted' and move.move_type == 'out_invoice':
-                    try:
-                        move.action_sync_seerbit_invoice()
-                    except Exception as e:
-                        _logger.warning(f"Re-sync Seerbit Invoice failed for {move.name}: {e}")
-        return res
 
     def action_sync_seerbit_invoice(self):
         self.ensure_one()
@@ -122,20 +111,26 @@ class AccountMove(models.Model):
                         'amount': move.amount_residual,
                         'journal_id': journal.id,
                         'payment_method_line_id': journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_method_id == payment_method)[:1].id or journal.inbound_payment_method_line_ids[:1].id,
-                        'ref': f"Sync: {move.seerbit_invoice_no}",
+                        'memo': f"Sync: {move.seerbit_invoice_no}",
                     }
                     payment = self.env['account.payment'].create(payment_vals)
                     payment.action_post()
                     
                     # Reconcile specifically with this invoice
-                    payment_lines = payment.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+                    payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
                     invoice_lines = move.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
                     
                     if payment_lines and invoice_lines:
                         (payment_lines + invoice_lines).reconcile()
                     
     def action_check_all_seerbit_status(self):
-        invoices = self.search([('synced_with_seerbit', '=', True), ('state', '=', 'posted')])
+        invoices = self.search([
+            ('synced_with_seerbit', '=', True), 
+            ('state', '=', 'posted'),
+            '|',
+            ('seerbit_invoice_status', '=', False),
+            ('seerbit_invoice_status', 'not in', ['PAID', 'SUCCESS'])
+        ])
         invoices.action_check_seerbit_status()
 
     def action_send_payment_to_pos(self):
@@ -145,23 +140,106 @@ class AccountMove(models.Model):
         if amount_due <= 0:
             raise UserError(_("There is no outstanding amount to send to POS."))
             
-        pos_method = self.env['pos.payment.method'].search([('seerbit_public_key', '!=', False)], limit=1)
-        if not pos_method:
+        pos_methods = self.env['pos.payment.method'].search([('seerbit_public_key', '!=', False)])
+        if not pos_methods:
             raise UserError(_("No Seerbit POS payment method configured."))
             
+        # Return action to open the wizard in the UI
+        return {
+            'name': _('Select POS Terminal'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'seerbit.invoice.payment.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_invoice_id': self.id,
+                'default_pos_payment_method_id': pos_methods[0].id if len(pos_methods) == 1 else False,
+            }
+        }
+
+    def action_process_seerbit_pos_payment(self, transaction_ref, amount):
+        self.ensure_one()
+        
+        # Find Seerbit Bank Journal
+        journal = self.env['account.journal'].search([('type', '=', 'bank'), ('name', 'ilike', 'Seerbit')], limit=1)
+        if not journal:
+            journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
+            
+        payment_method = self.env.ref('account.account_payment_method_manual_in')
+        
+        # Ensure we don't process the same transaction reference multiple times
+        existing_payment = self.env['account.payment'].search([('move_id.ref', '=', transaction_ref)], limit=1)
+        if existing_payment:
+            # Reconcile if not already reconciled
+            payment_lines = existing_payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+            invoice_lines = self.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+            if payment_lines and invoice_lines:
+                (payment_lines + invoice_lines).reconcile()
+            return True
+            
+        payment_vals = {
+            'payment_type': 'inbound',
+            'partner_type': 'customer',
+            'partner_id': self.partner_id.id,
+            'amount': float(amount or self.amount_residual),
+            'journal_id': journal.id,
+            'payment_method_line_id': journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_method_id == payment_method)[:1].id or journal.inbound_payment_method_line_ids[:1].id,
+            'memo': transaction_ref,
+        }
+        payment = self.env['account.payment'].create(payment_vals)
+        payment.action_post()
+        
+        # Reconcile specifically with this invoice
+        payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+        invoice_lines = self.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+        
+        if payment_lines and invoice_lines:
+            (payment_lines + invoice_lines).reconcile()
+            
+        return True
+
+    def action_resend_seerbit_pos_payment(self, terminal_id=None):
+        self.ensure_one()
+        t_id = terminal_id if (terminal_id and terminal_id != 'undefined') else self.seerbit_terminal_id
+        if not t_id:
+            # Fallback: search for any Seerbit payment terminal configured
+            pos_method = self.env['pos.payment.method'].search([('use_payment_terminal', '=', 'seerbit'), ('seerbit_terminal_id', '!=', False)], limit=1)
+            if pos_method:
+                t_id = pos_method.seerbit_terminal_id
+        if not t_id:
+            raise UserError(_("No Seerbit terminal ID specified or found for this transaction."))
+
+        pos_method = self.env['pos.payment.method'].search([('seerbit_terminal_id', '=', t_id)], limit=1)
+        if not pos_method:
+            raise UserError(_("POS Terminal with ID %s not found.") % t_id)
+
+        import json
+
+        metadata = json.dumps({
+            'created_by': 'odoo_pos_seerbit',
+            'created_time': fields.Datetime.now().isoformat() + 'Z',
+            'invoice_id': str(self.id),
+            'user_id': str(self.env.user.id),
+            'payment_method_id': str(pos_method.id),
+            'company_id': str(self.company_id.id),
+        })
+
         payload = {
             'id': str(self.id),
-            'posid': pos_method.seerbit_terminal_id,
-            'merchantid': "Odoo",
-            'metadata': f"Invoice {self.name}",
-            'transactionValue': str(amount_due),
-            'status': "PENDING",
-            'transactionTime': fields.Datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'sessionId': f"INV-{self.id}",
-            'receivedDateTime': fields.Datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'transactionRef': f"INV-{self.id}",
-            'pubkey': pos_method.seerbit_public_key,
+            'posid': str(pos_method.seerbit_terminal_id),
+            'merchantid': '',
+            'metadata': metadata,
+            'transactionValue': '%.2f' % self.amount_residual,
+            'status': 'open',
+            'transactionTime': '',
+            'sessionId': '',
+            'receivedDateTime': fields.Datetime.now().strftime("%d/%m/%Y %H:%M"),
+            'transactionRef': '',
+            'pubkey': str(pos_method.seerbit_public_key),
         }
-        
-        # Uses the existing Firestore push logic
+
+        # Log constructed payload
+        _logger.info("Resending payment request to POS from Invoice Action: %s", payload)
+
         pos_method.send_seerbit_payment_request(payload)
+        return True
