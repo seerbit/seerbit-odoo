@@ -136,7 +136,7 @@ class SeerbitAPI:
         if not self.public_key:
             raise UserError("Seerbit Public Key is not configured. Please check your POS settings.")
             
-        url = f"{self.base_url}/invoice/{self.public_key}/send/{invoice_no}"
+        url = f"https://merchant.seerbitapi.com/invoice/{self.public_key}/send/{invoice_no}"
         
         try:
             response = requests.get(url, headers=self._get_headers(), timeout=10)
@@ -145,7 +145,7 @@ class SeerbitAPI:
             response.raise_for_status()
             res_data = response.json()
             
-            if res_data.get('status') == 'SUCCESS' or res_data.get('code') == '00':
+            if res_data.get('status') == 'SUCCESS' or str(res_data.get('code')) in ('00', '200'):
                 return True
                 
             raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
@@ -166,3 +166,99 @@ class SeerbitAPI:
         except Exception as e:
             _logger.warning(f"Seerbit Delete Invoice Error: {e}")
             return False
+
+    # Payment Links
+    def create_payment_link(self, amount, currency, email, description, paymentLinkName, oneTime=True):
+        import uuid
+        url = 'https://paymentlink.seerbitapi.com/paymentlink/v2/payLinks/api'
+        payload = {
+            "status": "ACTIVE",
+            "paymentLinkName": paymentLinkName,
+            "description": description,
+            "currency": currency,
+            "amount": str(amount),
+            "successMessage": "Thank you for your payment",
+            "publicKey": self.public_key,
+            "customizationName": f"Odoo-{uuid.uuid4().hex[:8]}",
+            "paymentFrequency": "ONE_TIME",
+            "email": email,
+            "requiredFields": {
+                "address": False,
+                "amount": True,
+                "customerName": True,
+                "mobileNumber": False,
+                "invoiceNumber": False
+            },
+            "linkExpirable": False,
+            "oneTime": oneTime
+        }
+        
+        try:
+            response = requests.post(url, headers=self._get_headers(), json=payload, timeout=15)
+            _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
+            response.raise_for_status()
+            res_data = response.json()
+            if res_data.get('data') and 'paymentLinks' in res_data['data']:
+                return res_data['data']['paymentLinks']
+            raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.error(f"Seerbit Create Payment Link Error: {e}")
+            raise UserError(f"Failed to create Seerbit Payment Link: {str(e)}")
+
+    def update_payment_link(self, payment_link_id, amount, currency, email, description, paymentLinkName, oneTime=True):
+        import uuid
+        url = 'https://paymentlink.seerbitapi.com/paymentlink/v2/payLinks/api'
+        payload = {
+            "paymentLinkId": payment_link_id,
+            "status": "ACTIVE",
+            "paymentLinkName": paymentLinkName,
+            "description": description,
+            "currency": currency,
+            "amount": str(amount),
+            "successMessage": "Thank you for your payment",
+            "publicKey": self.public_key,
+            "customizationName": f"Odoo-{uuid.uuid4().hex[:8]}",
+            "paymentFrequency": "ONE_TIME",
+            "email": email,
+            "requiredFields": {
+                "address": False,
+                "amount": True,
+                "customerName": True,
+                "mobileNumber": False,
+                "invoiceNumber": False
+            },
+            "linkExpirable": False,
+            "oneTime": oneTime
+        }
+        
+        try:
+            response = requests.put(url, headers=self._get_headers(), json=payload, timeout=15)
+            _logger.info("Seerbit HTTPS Response [PUT %s]: Status %s - Body: %s", url, response.status_code, response.text)
+            response.raise_for_status()
+            res_data = response.json()
+            if res_data.get('status') == 'SUCCESS' or str(res_data.get('code')) in ('00', '200'):
+                return True
+            raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.error(f"Seerbit Update Payment Link Error: {e}")
+            raise UserError(f"Failed to update Seerbit Payment Link: {str(e)}")
+
+    def delete_payment_link(self, payment_link_id):
+        url = f'https://paymentlink.seerbitapi.com/paymentlink/v2/payLinks/api/deleteLink/{payment_link_id}'
+        try:
+            response = requests.delete(url, headers=self._get_headers(), timeout=15)
+            _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
+            response.raise_for_status()
+            res_data = response.json()
+            if res_data.get('status') == 'Deleted':
+                return True
+            raise UserError(f"Seerbit Error: {res_data.get('message', 'Unknown Error')}")
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.error(f"Seerbit Delete Payment Link Error: {e}")
+            raise UserError(f"Failed to delete Seerbit Payment Link: {str(e)}")

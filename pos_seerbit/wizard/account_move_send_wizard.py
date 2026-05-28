@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+import threading
+import odoo
+
+def threaded_send_invoice(db_name, uid, invoice_no):
+    registry = odoo.registry(db_name)
+    with registry.cursor() as cr:
+        env = api.Environment(cr, uid, {})
+        from ..services.seerbit_api import SeerbitAPI
+        api_client = SeerbitAPI(env)
+        try:
+            api_client.send_invoice(invoice_no)
+        except Exception:
+            pass
 
 class AccountMoveSendWizard(models.TransientModel):
     _inherit = 'account.move.send.wizard'
@@ -26,8 +39,10 @@ class AccountMoveSendWizard(models.TransientModel):
                 
                 # If successfully synced, it will have a seerbit_invoice_no
                 if wizard.move_id.seerbit_invoice_no:
-                    from ..services.seerbit_api import SeerbitAPI
-                    api_client = SeerbitAPI(self.env)
-                    api_client.send_invoice(wizard.move_id.seerbit_invoice_no)
+                    # Run send_invoice asynchronously so the UI modal closes early
+                    threading.Thread(
+                        target=threaded_send_invoice, 
+                        args=(self.env.cr.dbname, self.env.uid, wizard.move_id.seerbit_invoice_no)
+                    ).start()
 
         return res

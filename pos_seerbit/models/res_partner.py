@@ -164,14 +164,28 @@ class ResPartner(models.Model):
                     ], limit=1)
                     
                     if existing_payment:
+                        changed = False
                         if existing_payment.state == 'draft':
                             _logger.info(f"Found existing pending payment {ref} for {self.name}. Posting it...")
                             existing_payment.action_post()
+                            changed = True
                         if existing_payment.state == 'in_process':
                             self._reconcile_seerbit_payment(existing_payment)
+                            changed = True
+                        
+                        if changed:
+                            self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                                'title': 'Seerbit Payment Updated',
+                                'message': f'Virtual Account payment {ref} updated.',
+                            })
+                            
                     elif amount:
                         _logger.info(f"Found missing payment {ref} for {self.name}. Processing...")
                         self._process_seerbit_va_payment(self, amount, ref)
+                        self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                            'title': 'Seerbit Payment Received',
+                            'message': f'VA Payment of {amount} received for {self.name}',
+                        })
         else:
             raise Exception(f"Seerbit API returned status code {response.status_code}")
 
@@ -238,7 +252,11 @@ class ResPartner(models.Model):
         for invoice in invoices:
             if not payment_lines:
                 break
-            invoice_lines = invoice.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+            invoice_lines = invoice.line_ids.filtered(
+                lambda line: line.account_id.account_type == 'asset_receivable' 
+                and not line.reconciled 
+                and line.account_id == payment_lines[0].account_id
+            )
             if invoice_lines:
                 (payment_lines + invoice_lines).reconcile()
                 payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
@@ -252,12 +270,18 @@ class ResPartner(models.Model):
         if not liquidity_lines:
             return
             
+        partner_bank = self.env['res.partner.bank'].search([
+            ('partner_id', '=', payment.partner_id.id),
+            ('acc_number', '=', payment.partner_id.seerbit_va_account_number)
+        ], limit=1)
+
         st_line = self.env['account.bank.statement.line'].create({
             'payment_ref': payment.memo or 'Seerbit Auto Sync',
             'journal_id': payment.journal_id.id,
             'amount': payment.amount if payment.payment_type == 'inbound' else -payment.amount,
             'date': payment.date,
             'partner_id': payment.partner_id.id,
+            'partner_bank_id': partner_bank.id if partner_bank else False,
         })
         
         suspense_line = st_line.move_id.line_ids.filtered(lambda l: l.account_id == st_line.journal_id.suspense_account_id)

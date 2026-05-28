@@ -11,6 +11,7 @@ class AccountMove(models.Model):
     seerbit_invoice_no = fields.Char(string='Seerbit Invoice No', copy=False, readonly=True)
     seerbit_invoice_status = fields.Char(string='Seerbit Status', copy=False, readonly=True)
     seerbit_terminal_id = fields.Char(string='Seerbit Terminal ID', copy=False)
+    seerbit_payment_link_ids = fields.One2many('pos_seerbit.payment.link', 'move_id', string='Seerbit Payment Links')
 
     def action_post(self):
         res = super().action_post()
@@ -94,6 +95,7 @@ class AccountMove(models.Model):
             if res:
                 # Update status if needed (e.g., if Seerbit API returns PAID)
                 status = res.get('status', '').upper()
+                status_changed = move.seerbit_invoice_status != status
                 move.seerbit_invoice_status = status
                 
                 if status in ['PAID', 'SUCCESS'] and move.payment_state in ['not_paid', 'partial']:
@@ -118,10 +120,24 @@ class AccountMove(models.Model):
                     
                     # Reconcile specifically with this invoice
                     payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-                    invoice_lines = move.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+                    invoice_lines = move.line_ids.filtered(
+                        lambda line: line.account_id.account_type == 'asset_receivable' 
+                        and not line.reconciled
+                        and payment_lines and line.account_id == payment_lines[0].account_id
+                    )
                     
                     if payment_lines and invoice_lines:
                         (payment_lines + invoice_lines).reconcile()
+                    
+                    self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                        'title': 'Seerbit Payment',
+                        'message': f'Invoice {move.name} was paid on Seerbit',
+                    })
+                elif status_changed:
+                    self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                        'title': 'Seerbit Status Update',
+                        'message': f'Invoice {move.name} status is now {status}',
+                    })
                     
     def action_check_all_seerbit_status(self):
         invoices = self.search([
@@ -172,7 +188,11 @@ class AccountMove(models.Model):
         if existing_payment:
             # Reconcile if not already reconciled
             payment_lines = existing_payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-            invoice_lines = self.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+            invoice_lines = self.line_ids.filtered(
+                lambda line: line.account_id.account_type == 'asset_receivable' 
+                and not line.reconciled
+                and payment_lines and line.account_id == payment_lines[0].account_id
+            )
             if payment_lines and invoice_lines:
                 (payment_lines + invoice_lines).reconcile()
             return True
@@ -191,7 +211,11 @@ class AccountMove(models.Model):
         
         # Reconcile specifically with this invoice
         payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-        invoice_lines = self.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+        invoice_lines = self.line_ids.filtered(
+            lambda line: line.account_id.account_type == 'asset_receivable' 
+            and not line.reconciled
+            and payment_lines and line.account_id == payment_lines[0].account_id
+        )
         
         if payment_lines and invoice_lines:
             (payment_lines + invoice_lines).reconcile()

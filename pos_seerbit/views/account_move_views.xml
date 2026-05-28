@@ -16,6 +16,21 @@
                 <field name="seerbit_invoice_no" readonly="1" invisible="not synced_with_seerbit"/>
                 <field name="seerbit_invoice_status" readonly="1" invisible="not synced_with_seerbit"/>
             </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="seerbit_payment_links" string="Seerbit Payment Links">
+                    <field name="seerbit_payment_link_ids">
+                        <list string="Seerbit Payment Links" editable="bottom">
+                            <field name="name"/>
+                            <field name="description"/>
+                            <field name="amount"/>
+                            <field name="create_date" readonly="1"/>
+                            <field name="seerbit_link_id" readonly="1"/>
+                            <field name="link_url" widget="url" readonly="1"/>
+                            <field name="state" widget="badge" decoration-success="state == 'paid'" decoration-info="state == 'pending'" readonly="1"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
         </field>
     </record>
 </odoo>

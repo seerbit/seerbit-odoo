@@ -25,6 +25,7 @@
         "data/cron.xml",
         "wizard/seerbit_invoice_payment_wizard_views.xml",
         "wizard/account_move_send_wizard_views.xml",
+        "wizard/payment_link_wizard_views.xml",
         "views/res_config_settings_views.xml",
         "views/pos_payment_method_views.xml",
         "views/res_partner_views.xml",
@@ -44,6 +45,7 @@
             "pos_seerbit/static/lib/firestore/firebase-firestore-compat.js",
             "pos_seerbit/static/src/js/firebase_init.js",
             "pos_seerbit/static/src/js/invoice_reconciliation.js",
+            "pos_seerbit/static/src/js/bus_listener.js",
             "pos_seerbit/static/src/xml/InvoicePaymentListener.xml",
         ],
         "point_of_sale._assets_pos": [
