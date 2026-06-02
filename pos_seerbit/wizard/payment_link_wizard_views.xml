@@ -6,9 +6,10 @@
         <field name="inherit_id" ref="payment.payment_link_wizard_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='payment_info']" position="inside">
-                <field name="generate_seerbit_link" invisible="res_model != 'account.move'"/>
-                <field name="seerbit_link_name" invisible="not generate_seerbit_link"/>
-                <field name="seerbit_link_url" widget="CopyClipboardChar" invisible="not seerbit_link_url"/>
+                <field name="is_invoice_move" invisible="1"/>
+                <field name="generate_seerbit_link" invisible="not is_invoice_move"/>
+                <field name="seerbit_link_name" invisible="not generate_seerbit_link or not is_invoice_move"/>
+                <field name="seerbit_link_url" widget="CopyClipboardChar" invisible="not seerbit_link_url or not is_invoice_move"/>
             </xpath>
             <xpath expr="//footer/field[@name='link']" position="attributes">
                 <attribute name="invisible">generate_seerbit_link</attribute>
@@ -18,7 +19,7 @@
                         type="object" 
                         string="Generate Seerbit Link" 
                         class="btn-primary" 
-                        invisible="not generate_seerbit_link or seerbit_link_url"/>
+                        invisible="not generate_seerbit_link or seerbit_link_url or not is_invoice_move"/>
             </xpath>
         </field>
     </record>

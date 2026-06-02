@@ -19,10 +19,17 @@ class SeerbitAPI:
         if not self.secret_key or not self.public_key:
             _logger.warning("Seerbit Secret Key or Public Key is not configured.")
 
-    def _get_encrypted_key(self):
-        if self._encrypted_key:
+    def _get_encrypted_key(self, force_refresh=False):
+        if self._encrypted_key and not force_refresh:
             return self._encrypted_key
             
+        param_obj = self.env['ir.config_parameter'].sudo()
+        if not force_refresh:
+            cached_key = param_obj.get_param('pos_seerbit.seerbit_encrypted_key')
+            if cached_key:
+                self._encrypted_key = cached_key
+                return cached_key
+
         if not self.secret_key or not self.public_key:
              raise UserError("Seerbit keys are missing. Please configure them in Settings.")
 
@@ -31,17 +38,23 @@ class SeerbitAPI:
             "key": f"{self.secret_key}.{self.public_key}"
         }
         try:
-            response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=10)
+            response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, timeout=5)
             response.raise_for_status()
             res_data = response.json()
             if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
                 data = res_data['data']
                 if 'EncryptedSecKey' in data and 'encryptedKey' in data['EncryptedSecKey']:
                     self._encrypted_key = data['EncryptedSecKey']['encryptedKey']
+                    param_obj.set_param('pos_seerbit.seerbit_encrypted_key', self._encrypted_key)
                     return self._encrypted_key
             raise UserError("Failed to parse encrypted key from Seerbit response")
         except Exception as e:
             _logger.error(f"Seerbit Encrypt Key Error: {e}")
+            if not force_refresh:
+                cached_key = param_obj.get_param('pos_seerbit.seerbit_encrypted_key')
+                if cached_key:
+                    self._encrypted_key = cached_key
+                    return cached_key
             raise UserError(f"Failed to authenticate with Seerbit: {str(e)}")
 
     def _get_headers(self):
@@ -49,6 +62,55 @@ class SeerbitAPI:
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self._get_encrypted_key()}'
         }
+
+    def _do_request(self, method, url, **kwargs):
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = 10
+            
+        headers = kwargs.get('headers')
+        if not headers:
+            headers = self._get_headers()
+            kwargs['headers'] = headers
+            
+        try:
+            response = requests.request(method, url, **kwargs)
+            if response.status_code == 401:
+                _logger.info("Seerbit request returned 401. Attempting to refresh token...")
+                self._get_encrypted_key(force_refresh=True)
+                if 'PublicKey' in kwargs['headers']:
+                    kwargs['headers']['Authorization'] = f'Bearer {self._get_encrypted_key()}'
+                else:
+                    kwargs['headers'] = self._get_headers()
+                response = requests.request(method, url, **kwargs)
+                
+            return response
+        except Exception as e:
+            _logger.error("Seerbit request failed [%s %s]: %s", method, url, str(e))
+            raise
+
+    @staticmethod
+    def send_pos_fallback(payload):
+        """
+        Sends a payload to the POS notification fallback endpoint.
+        Does not require authentication.
+        """
+        url = "https://posnotification.seerbitapi.com/"
+        try:
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+            if response.status_code in (200, 201):
+                _logger.info("Payload sent to fallback endpoint successfully: %s", payload.get('id'))
+                return True
+            else:
+                _logger.warning("Fallback endpoint returned error %s: %s", response.status_code, response.text)
+                return False
+        except requests.exceptions.ReadTimeout:
+            _logger.warning("Fallback endpoint timed out for transaction ID: %s", payload.get('id'))
+            return False
+        except Exception as e:
+            _logger.warning("Failed to send to fallback endpoint: %s", str(e))
+            return False
 
     # Virtual Accounts
     def create_virtual_account(self, full_name, reference, email, currency="NGN", country="NG"):
@@ -64,7 +126,7 @@ class SeerbitAPI:
         }
         
         try:
-            response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+            response = self._do_request('POST', url, json=payload)
             _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
@@ -80,13 +142,27 @@ class SeerbitAPI:
     def delete_virtual_account(self, reference):
         url = f'https://seerbitapi.com/api/v2/virtual-accounts/{reference}'
         try:
-            response = requests.delete(url, headers=self._get_headers(), timeout=10)
+            response = self._do_request('DELETE', url)
             _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             return response.json()
         except Exception as e:
             _logger.error(f"Seerbit Delete VA Error: {e}")
             return False
+
+    def get_virtual_account_payments(self, account_number):
+        url = f'https://seerbitapi.com/api/v2/virtual-accounts/{self.public_key}/{account_number}'
+        try:
+            response = self._do_request('GET', url)
+            _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
+            response.raise_for_status()
+            res_data = response.json()
+            if res_data.get('status') == 'SUCCESS' and 'data' in res_data:
+                return res_data['data'].get('payload', [])
+            return []
+        except Exception as e:
+            _logger.error(f"Seerbit Get VA Payments Error: {e}")
+            raise UserError(f"Failed to fetch VA payments: {str(e)}")
 
     # Invoicing
     def create_invoice(self, order_no, due_date, currency, receivers_name, customer_email, invoice_items):
@@ -102,7 +178,7 @@ class SeerbitAPI:
         }
         
         try:
-            response = requests.post(url, headers=self._get_headers(), json=payload, timeout=10)
+            response = self._do_request('POST', url, json=payload)
             _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
@@ -118,7 +194,7 @@ class SeerbitAPI:
     def get_invoice(self, invoice_no):
         url = f'https://merchant.seerbitapi.com/invoice/{self.public_key}/{invoice_no}'
         try:
-            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            response = self._do_request('GET', url)
             _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
@@ -139,7 +215,7 @@ class SeerbitAPI:
         url = f"https://merchant.seerbitapi.com/invoice/{self.public_key}/send/{invoice_no}"
         
         try:
-            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            response = self._do_request('GET', url)
             _logger.info("Seerbit HTTPS Response [GET %s]: Status %s - Body: %s", url, response.status_code, response.text)
             
             response.raise_for_status()
@@ -159,7 +235,7 @@ class SeerbitAPI:
     def delete_invoice(self, invoice_no):
         url = f'https://merchant.seerbitapi.com/invoice/{self.public_key}/{invoice_no}'
         try:
-            response = requests.delete(url, headers=self._get_headers(), timeout=10)
+            response = self._do_request('DELETE', url)
             _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             return True
@@ -194,7 +270,7 @@ class SeerbitAPI:
         }
         
         try:
-            response = requests.post(url, headers=self._get_headers(), json=payload, timeout=15)
+            response = self._do_request('POST', url, json=payload)
             _logger.info("Seerbit HTTPS Response [POST %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
@@ -234,7 +310,7 @@ class SeerbitAPI:
         }
         
         try:
-            response = requests.put(url, headers=self._get_headers(), json=payload, timeout=15)
+            response = self._do_request('PUT', url, json=payload)
             _logger.info("Seerbit HTTPS Response [PUT %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()
@@ -250,7 +326,7 @@ class SeerbitAPI:
     def delete_payment_link(self, payment_link_id):
         url = f'https://paymentlink.seerbitapi.com/paymentlink/v2/payLinks/api/deleteLink/{payment_link_id}'
         try:
-            response = requests.delete(url, headers=self._get_headers(), timeout=15)
+            response = self._do_request('DELETE', url)
             _logger.info("Seerbit HTTPS Response [DELETE %s]: Status %s - Body: %s", url, response.status_code, response.text)
             response.raise_for_status()
             res_data = response.json()

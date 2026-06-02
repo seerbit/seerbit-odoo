@@ -6,10 +6,10 @@
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
-                <button name="action_sync_seerbit_invoice" type="object" string="Sync with Seerbit" class="oe_highlight" invisible="state != 'posted' or synced_with_seerbit"/>
-                <button name="action_check_seerbit_status" type="object" string="Check Seerbit Status" invisible="not synced_with_seerbit"/>
-                <button name="action_sync_seerbit_invoice" type="object" string="Update Seerbit" invisible="not synced_with_seerbit"/>
-                <button name="action_send_payment_to_pos" type="object" string="Send Payment to POS" invisible="state != 'posted' or payment_state in ('in_payment', 'paid')"/>
+                <button name="action_sync_seerbit_invoice" type="object" string="Sync with Seerbit" class="oe_highlight" invisible="move_type != 'out_invoice' or state != 'posted' or synced_with_seerbit"/>
+                <button name="action_check_seerbit_status" type="object" string="Check Seerbit Status" invisible="move_type != 'out_invoice' or not synced_with_seerbit"/>
+                <button name="action_sync_seerbit_invoice" type="object" string="Update Seerbit" invisible="move_type != 'out_invoice' or not synced_with_seerbit"/>
+                <button name="action_send_payment_to_pos" type="object" string="Send Payment to POS" invisible="move_type != 'out_invoice' or state != 'posted' or payment_state in ('in_payment', 'paid')"/>
             </xpath>
             <xpath expr="//group[@id='header_right_group']" position="inside">
                 <field name="synced_with_seerbit" readonly="1"/>
@@ -17,7 +17,7 @@
                 <field name="seerbit_invoice_status" readonly="1" invisible="not synced_with_seerbit"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page name="seerbit_payment_links" string="Seerbit Payment Links">
+                <page name="seerbit_payment_links" string="Seerbit Payment Links" invisible="move_type != 'out_invoice'">
                     <field name="seerbit_payment_link_ids">
                         <list string="Seerbit Payment Links" editable="bottom">
                             <field name="name"/>

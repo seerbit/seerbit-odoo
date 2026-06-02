@@ -7,6 +7,16 @@ class PaymentLinkWizard(models.TransientModel):
     generate_seerbit_link = fields.Boolean(string="Generate and send with Seerbit")
     seerbit_link_name = fields.Char(string="Seerbit Link Name")
     seerbit_link_url = fields.Char(string="Seerbit Link", readonly=True)
+    is_invoice_move = fields.Boolean(compute='_compute_is_invoice_move')
+
+    @api.depends('res_model', 'res_id')
+    def _compute_is_invoice_move(self):
+        for wizard in self:
+            if wizard.res_model == 'account.move' and wizard.res_id:
+                move = self.env['account.move'].browse(wizard.res_id)
+                wizard.is_invoice_move = move.move_type == 'out_invoice'
+            else:
+                wizard.is_invoice_move = False
 
     def action_generate_seerbit_link(self):
         self.ensure_one()

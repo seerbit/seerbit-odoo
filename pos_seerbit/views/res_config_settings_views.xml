@@ -21,6 +21,15 @@
                             <setting string="Seerbit Secret Key" invisible="not module_pos_seerbit">
                                 <field name="seerbit_secret_key" placeholder="YOUR_SECRET_KEY"/>
                             </setting>
+                            <setting string="Seerbit Pocket ID" invisible="not module_pos_seerbit">
+                                <field name="seerbit_pocket_id" placeholder="SBP..."/>
+                            </setting>
+                            <setting string="Seerbit Pocket Email" invisible="not module_pos_seerbit">
+                                <field name="seerbit_pocket_email" placeholder="merchant@domain.com"/>
+                            </setting>
+                            <setting string="Seerbit Pocket Password" invisible="not module_pos_seerbit">
+                                <field name="seerbit_pocket_password" placeholder="••••••••" password="True"/>
+                            </setting>
                             <setting string="Seerbit Firebase API Key" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firebase_api_key" placeholder="AIzaSy..."/>
                             </setting>
@@ -40,5 +49,12 @@
         </record>
     </data>
 
+    <record id="action_pos_seerbit_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module' : 'pos_seerbit', 'bin_size': False}</field>
+    </record>
     
 </odoo>

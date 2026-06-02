@@ -106,28 +106,49 @@ class AccountMove(models.Model):
                         
                     payment_method = self.env.ref('account.account_payment_method_manual_in')
                     
-                    payment_vals = {
-                        'payment_type': 'inbound',
-                        'partner_type': 'customer',
-                        'partner_id': move.partner_id.id,
-                        'amount': move.amount_residual,
-                        'journal_id': journal.id,
-                        'payment_method_line_id': journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_method_id == payment_method)[:1].id or journal.inbound_payment_method_line_ids[:1].id,
-                        'memo': f"Sync: {move.seerbit_invoice_no}",
-                    }
-                    payment = self.env['account.payment'].create(payment_vals)
-                    payment.action_post()
+                    invoice_receivable_line = move.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable')
+                    dest_account_id = invoice_receivable_line[0].account_id.id if invoice_receivable_line else False
+                    
+                    existing_payment = self.env['account.payment'].search([('memo', '=', f"Sync: {move.seerbit_invoice_no}")], limit=1)
+                    if existing_payment:
+                        payment = existing_payment
+                        if payment.state == 'draft':
+                            payment.action_post()
+                    else:
+                        paid_amount = float(res.get('totalAmount')) if res.get('totalAmount') is not None else move.amount_residual
+                        payment_method_line = journal.inbound_payment_method_line_ids.filtered(
+                        lambda l: l.payment_method_id == payment_method
+                    )[:1] or journal.inbound_payment_method_line_ids[:1]
+
+                        payment_vals = {
+                            'payment_type': 'inbound',
+                            'partner_type': 'customer',
+                            'partner_id': move.partner_id.id,
+                            'amount': paid_amount,
+                            'journal_id': journal.id,
+                            'payment_method_line_id': payment_method_line.id,
+                            'memo': f"Sync: {move.seerbit_invoice_no}",
+                        }
+                        if dest_account_id:
+                            payment_vals['destination_account_id'] = dest_account_id
+                            
+                        outstanding_acc = payment_method_line.payment_account_id or journal.default_account_id or journal.company_id.transfer_account_id
+                        if outstanding_acc:
+                            payment_vals['force_outstanding_account_id'] = outstanding_acc.id
+                            
+                        payment = self.env['account.payment'].create(payment_vals)
+                        payment.action_post()
                     
                     # Reconcile specifically with this invoice
                     payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-                    invoice_lines = move.line_ids.filtered(
-                        lambda line: line.account_id.account_type == 'asset_receivable' 
-                        and not line.reconciled
-                        and payment_lines and line.account_id == payment_lines[0].account_id
-                    )
-                    
-                    if payment_lines and invoice_lines:
-                        (payment_lines + invoice_lines).reconcile()
+                    if payment_lines:
+                        try:
+                            move.js_assign_outstanding_line(payment_lines[0].id)
+                        except Exception as e:
+                            _logger.error(f"Failed to auto-reconcile payment for invoice {move.name}: {e}")
+                            
+                    if payment.state == 'in_process':
+                        move.partner_id.sudo()._reconcile_seerbit_payment(payment)
                     
                     self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
                         'title': 'Seerbit Payment',
@@ -145,7 +166,11 @@ class AccountMove(models.Model):
             ('state', '=', 'posted'),
             '|',
             ('seerbit_invoice_status', '=', False),
-            ('seerbit_invoice_status', 'not in', ['PAID', 'SUCCESS'])
+            '|',
+            ('seerbit_invoice_status', 'not in', ['PAID', 'SUCCESS']),
+            '&',
+            ('seerbit_invoice_status', 'in', ['PAID', 'SUCCESS']),
+            ('payment_state', 'in', ['not_paid', 'partial']),
         ])
         invoices.action_check_seerbit_status()
 
@@ -188,15 +213,16 @@ class AccountMove(models.Model):
         if existing_payment:
             # Reconcile if not already reconciled
             payment_lines = existing_payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-            invoice_lines = self.line_ids.filtered(
-                lambda line: line.account_id.account_type == 'asset_receivable' 
-                and not line.reconciled
-                and payment_lines and line.account_id == payment_lines[0].account_id
-            )
-            if payment_lines and invoice_lines:
-                (payment_lines + invoice_lines).reconcile()
+            if payment_lines:
+                try:
+                    self.js_assign_outstanding_line(payment_lines[0].id)
+                except Exception as e:
+                    _logger.error(f"Failed to auto-reconcile payment for invoice {self.name}: {e}")
             return True
             
+        invoice_receivable_line = self.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable')
+        dest_account_id = invoice_receivable_line[0].account_id.id if invoice_receivable_line else False
+        
         payment_vals = {
             'payment_type': 'inbound',
             'partner_type': 'customer',
@@ -206,19 +232,21 @@ class AccountMove(models.Model):
             'payment_method_line_id': journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_method_id == payment_method)[:1].id or journal.inbound_payment_method_line_ids[:1].id,
             'memo': transaction_ref,
         }
+        if dest_account_id:
+            payment_vals['destination_account_id'] = dest_account_id
         payment = self.env['account.payment'].create(payment_vals)
         payment.action_post()
         
         # Reconcile specifically with this invoice
         payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-        invoice_lines = self.line_ids.filtered(
-            lambda line: line.account_id.account_type == 'asset_receivable' 
-            and not line.reconciled
-            and payment_lines and line.account_id == payment_lines[0].account_id
-        )
-        
-        if payment_lines and invoice_lines:
-            (payment_lines + invoice_lines).reconcile()
+        if payment_lines:
+            try:
+                self.js_assign_outstanding_line(payment_lines[0].id)
+            except Exception as e:
+                _logger.error(f"Failed to auto-reconcile payment for invoice {self.name}: {e}")
+                
+        if payment.state == 'in_process':
+            self.partner_id.sudo()._reconcile_seerbit_payment(payment)
             
         return True
 

@@ -5,3 +5,7 @@ from . import res_config_settings
 from . import res_partner
 from . import account_move
 from . import payment_link
+from . import virtual_account
+from . import payout
+from . import dashboard_backend
+from . import account_payment

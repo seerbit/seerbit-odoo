@@ -6,33 +6,28 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
             <xpath expr="//div[@name='button_box']" position="inside">
-                <button class="oe_stat_button" type="object" name="action_create_seerbit_va" icon="fa-bank" invisible="seerbit_va_account_number">
+                <button class="oe_stat_button" type="object" name="action_create_seerbit_va" icon="fa-bank">
                     <div class="o_stat_info">
                         <span class="o_stat_text">Create VA</span>
                     </div>
                 </button>
-                <button class="oe_stat_button" type="object" name="action_view_seerbit_va_balance" icon="fa-money" invisible="not seerbit_va_account_number">
+                <button class="oe_stat_button" type="object" name="action_view_virtual_accounts" icon="fa-money">
                     <div class="o_stat_info">
                         <span class="o_stat_value"><field name="seerbit_va_balance"/></span>
-                        <span class="o_stat_text">VA Balance</span>
+                        <span class="o_stat_text">Customer Total VA Balance</span>
                     </div>
                 </button>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Seerbit Virtual Account">
-                    <div class="oe_button_box" name="seerbit_button_box">
-                        <button name="action_refresh_seerbit_va_balance" type="object" string="Refresh VA Balance" class="oe_stat_button" icon="fa-refresh" invisible="not seerbit_va_account_number"/>
-                    </div>
-                    <group>
-                        <group>
-                            <field name="seerbit_va_name"/>
-                            <field name="seerbit_va_bank_name"/>
-                        </group>
-                        <group>
-                            <field name="seerbit_va_account_number"/>
-                            <field name="seerbit_va_reference"/>
-                        </group>
-                    </group>
+                <page string="Seerbit Virtual Accounts">
+                    <field name="seerbit_va_ids">
+                        <list>
+                            <field name="name"/>
+                            <field name="bank_name"/>
+                            <field name="account_number"/>
+                            <field name="balance"/>
+                        </list>
+                    </field>
                 </page>
             </xpath>
         </field>
