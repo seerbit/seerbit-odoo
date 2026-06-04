@@ -77,7 +77,8 @@ def post_init_hook(env):
                 ], limit=1)
             
             update_values = {}
-            if payment_method.journal_id != journal:
+            # Only update journal if it's different and the new journal exists
+            if payment_method.journal_id != journal and journal.exists():
                 update_values['journal_id'] = journal.id
             if payment_method.use_payment_terminal != 'seerbit':
                 update_values['use_payment_terminal'] = 'seerbit'
@@ -89,8 +90,20 @@ def post_init_hook(env):
                 update_values['company_id'] = company.id
             
             if update_values:
-                payment_method.write(update_values)
-                _logger.info("Updated Seerbit payment method with values: %s", update_values)
+                try:
+                    payment_method.write(update_values)
+                    _logger.info("Updated Seerbit payment method with values: %s", update_values)
+                except Exception as e:
+                    _logger.warning("Failed to update payment method: %s", str(e))
+                    # Try updating without the journal change
+                    if 'journal_id' in update_values:
+                        update_values.pop('journal_id')
+                        if update_values:
+                            try:
+                                payment_method.write(update_values)
+                                _logger.info("Updated Seerbit payment method (without journal): %s", update_values)
+                            except Exception as e2:
+                                _logger.error("Failed to update payment method even without journal: %s", str(e2))
             else:
                 _logger.info("Seerbit payment method already properly configured")
         else:

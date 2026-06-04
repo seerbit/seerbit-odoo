@@ -1,5 +1,5 @@
 # coding: utf-8
-from . import controllers, models
+from . import controllers, models, services, wizard
 from . import utils
 from .hooks import post_init_hook
 

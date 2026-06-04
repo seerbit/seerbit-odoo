@@ -59,6 +59,31 @@ class ResConfigSettings(models.TransientModel):
         help="The API key for your Firebase project (same for Firestore).",
         groups="base.group_erp_manager",
     )
+    seerbit_public_key = fields.Char(
+        string="Seerbit Public Key",
+        help="Global Seerbit Public Key, used as default for terminals and for global operations.",
+        groups="base.group_erp_manager",
+    )
+    seerbit_secret_key = fields.Char(
+        string="Seerbit Secret Key",
+        help="As provided on Seerbit dashboard. Used for Invoicing and Virtual Accounts.",
+        groups="base.group_erp_manager",
+    )
+    seerbit_pocket_id = fields.Char(
+        string="Seerbit Pocket ID",
+        help="Your Seerbit Pocket ID for fetching balances and processing payouts.",
+        groups="base.group_erp_manager",
+    )
+    seerbit_pocket_email = fields.Char(
+        string="Pocket Email",
+        help="Merchant email for Seerbit Pocket API.",
+        groups="base.group_erp_manager",
+    )
+    seerbit_pocket_password = fields.Char(
+        string="Pocket Password",
+        help="Merchant password for Seerbit Pocket API.",
+        groups="base.group_erp_manager",
+    )
 
     @api.constrains('seerbit_firestore_cred')
     def _validate_firestore_cred(self):
@@ -78,6 +103,11 @@ class ResConfigSettings(models.TransientModel):
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firestore_cred', self.seerbit_firestore_cred or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firestore_project_id', self.seerbit_firestore_project_id or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_firebase_api_key', self.seerbit_firebase_api_key or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_public_key', self.seerbit_public_key or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_secret_key', self.seerbit_secret_key or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_id', self.seerbit_pocket_id or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_email', self.seerbit_pocket_email or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_password', self.seerbit_pocket_password or '')
         
         # Log configuration changes
         if self.module_pos_seerbit:
@@ -92,6 +122,11 @@ class ResConfigSettings(models.TransientModel):
             seerbit_firestore_cred=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firestore_cred', default=''),
             seerbit_firestore_project_id=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firestore_project_id', default=''),
             seerbit_firebase_api_key=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_firebase_api_key', default=''),
+            seerbit_public_key=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_public_key', default=''),
+            seerbit_secret_key=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_secret_key', default=''),
+            seerbit_pocket_id=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_id', default=''),
+            seerbit_pocket_email=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_email', default=''),
+            seerbit_pocket_password=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_password', default=''),
         )
         return res
 

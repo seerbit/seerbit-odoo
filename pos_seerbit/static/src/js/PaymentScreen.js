@@ -2,7 +2,7 @@
 
 import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
 import { patch } from '@web/core/utils/patch';
-import { onMounted } from '@odoo/owl';
+import { onMounted, onWillUnmount } from '@odoo/owl';
 
 // Patch PaymentScreen to handle Seerbit payment line status
 patch(PaymentScreen.prototype, {
@@ -12,10 +12,25 @@ patch(PaymentScreen.prototype, {
             // Set pending Seerbit payments to waiting status
             const pendingPaymentLine = this.env.services.pos.getPendingPaymentLine('seerbit')
             if (pendingPaymentLine) {
+                console.log('Found pending Seerbit line')
                 pendingPaymentLine.set_payment_status('waitingSeerbit');
             }
         });
 
+        onWillUnmount(() => {
+            // When leaving the payment screen, ensure any Seerbit processes are stopped.
+            this.paymentLines.forEach(line => {
+                console.log('Checking payment line:', line);
+                if (line.payment_method_id.use_payment_terminal === 'seerbit') {
+                    console.log('Found Seerbit payment line');
+                    // The payment_terminal is the SeerbitPayment instance
+                    if (line.payment_method_id.payment_terminal) {
+                        console.log('Closing Seerbit payment line');
+                        line.payment_method_id.payment_terminal.close();
+                    }
+                }
+            });
+        });
     },
 
     
