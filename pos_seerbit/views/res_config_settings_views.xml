@@ -15,6 +15,18 @@
                                     Enable Seerbit payment terminal integration.
                                 </div>
                             </setting>
+                            <setting string="Automatically Post Payments" invisible="not module_pos_seerbit">
+                                <field name="seerbit_auto_post"/>
+                                <div class="text-muted">
+                                    Automatically post Seerbit payments to the ledger when received.
+                                </div>
+                            </setting>
+                            <setting string="Automatic Reconciliation" invisible="not module_pos_seerbit or not seerbit_auto_post">
+                                <field name="seerbit_auto_reconcile"/>
+                                <div class="text-muted">
+                                    Automatically reconcile Seerbit payments with invoices when payment is received.
+                                </div>
+                            </setting>
                             <setting string="Seerbit Public Key" invisible="not module_pos_seerbit">
                                 <field name="seerbit_public_key" placeholder="YOUR_PUBLIC_KEY"/>
                             </setting>

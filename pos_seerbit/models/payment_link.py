@@ -6,6 +6,7 @@ import uuid
 class SeerbitPaymentLink(models.Model):
     _name = 'pos_seerbit.payment.link'
     _description = 'Seerbit Payment Link'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'create_date desc'
 
     move_id = fields.Many2one('account.move', string="Invoice", ondelete='set null')
@@ -24,6 +25,34 @@ class SeerbitPaymentLink(models.Model):
         ('paid', 'Paid')
     ], string="Status", default="pending", readonly=True)
     payment_id = fields.Many2one('account.payment', string="Payment", readonly=True)
+    payment_ids = fields.One2many('account.payment', 'seerbit_payment_link_id', string="Payments", readonly=True)
+    payment_count = fields.Integer(compute='_compute_payment_count')
+
+    @api.depends('payment_ids', 'payment_id')
+    def _compute_payment_count(self):
+        for record in self:
+            count = len(record.payment_ids)
+            if record.payment_id and record.payment_id not in record.payment_ids:
+                count += 1
+            record.payment_count = count
+
+    def action_view_payments(self):
+        self.ensure_one()
+        domain = [('seerbit_payment_link_id', '=', self.id)]
+        if self.payment_id:
+            domain = ['|', ('seerbit_payment_link_id', '=', self.id), ('id', '=', self.payment_id.id)]
+        return {
+            'name': 'Payment Link Payments',
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.payment',
+            'view_mode': 'list,form',
+            'domain': domain,
+            'context': {
+                'default_partner_id': self.partner_id.id,
+                'default_payment_type': 'inbound',
+                'default_seerbit_payment_link_id': self.id,
+            }
+        }
     
     @api.onchange('move_id')
     def _onchange_move_id(self):
@@ -91,10 +120,12 @@ class SeerbitPaymentLink(models.Model):
             
         partner = self.partner_id or (self.move_id and self.move_id.partner_id)
         
+        company = self.move_id.company_id if self.move_id else (partner.company_id or self.env.company)
+        
         # Find Seerbit Bank Journal
-        journal = self.env['account.journal'].search([('type', '=', 'bank'), ('name', 'ilike', 'Seerbit')], limit=1)
+        journal = self.env['account.journal'].search([('type', '=', 'bank'), ('name', 'ilike', 'Seerbit'), ('company_id', '=', company.id)], limit=1)
         if not journal:
-            journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
+            journal = self.env['account.journal'].search([('type', '=', 'bank'), ('company_id', '=', company.id)], limit=1)
             
         payment_method = self.env.ref('account.account_payment_method_manual_in')
         
@@ -112,8 +143,10 @@ class SeerbitPaymentLink(models.Model):
                 'partner_id': partner.id,
                 'amount': float(amount),
                 'journal_id': journal.id,
+                'company_id': company.id,
                 'payment_method_line_id': payment_method_line.id,
                 'memo': reference,
+                'seerbit_payment_link_id': self.id,
             }
             if dest_account_id:
                 payment_vals['destination_account_id'] = dest_account_id
@@ -123,42 +156,49 @@ class SeerbitPaymentLink(models.Model):
                 payment_vals['force_outstanding_account_id'] = outstanding_acc.id
             
             payment = self.env['account.payment'].create(payment_vals)
-            payment.action_post()
+            auto_post = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+            if auto_post:
+                payment.action_post()
             
-            partner.sudo()._reconcile_seerbit_payment(payment)
-            
-            if self.move_id:
-                # Settle this specific invoice
-                payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-                if payment_lines:
-                    try:
-                        self.move_id.js_assign_outstanding_line(payment_lines[0].id)
-                    except Exception as e:
-                        _logger.error(f"Failed to auto-reconcile payment for invoice {self.move_id.name}: {e}")
-            else:
-                # FIFO Reconciliation for standalone links
-                payment_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable' and not l.reconciled)
-                if payment_lines:
-                    payment_line = payment_lines[0]
-                    unpaid_moves = self.env['account.move'].search([
-                        ('partner_id', '=', partner.id),
-                        ('move_type', 'in', ('out_invoice', 'out_refund')),
-                        ('state', '=', 'posted'),
-                        ('payment_state', 'in', ('not_paid', 'partial'))
-                    ], order='invoice_date asc, id asc')
-                    
-                    for move in unpaid_moves:
-                        if payment_line.reconciled:
-                            break
+            auto_reconcile = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_reconcile', default='True') == 'True'
+            if auto_post and auto_reconcile:
+                if self.move_id:
+                    # Settle this specific invoice
+                    payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+                    if payment_lines:
                         try:
-                            move.js_assign_outstanding_line(payment_line.id)
-                        except Exception:
-                            pass
+                            self.move_id.js_assign_outstanding_line(payment_lines[0].id)
+                            self.move_id.message_post(body=f"Seerbit Payment Link: Auto-reconciled payment of {amount}")
+                        except Exception as e:
+                            _logger.error(f"Failed to auto-reconcile payment for invoice {self.move_id.name}: {e}")
+                else:
+                    # FIFO Reconciliation for standalone links
+                    payment_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable' and not l.reconciled)
+                    if payment_lines:
+                        payment_line = payment_lines[0]
+                        unpaid_moves = self.env['account.move'].search([
+                            ('partner_id', '=', partner.id),
+                            ('move_type', 'in', ('out_invoice', 'out_refund')),
+                            ('state', '=', 'posted'),
+                            ('payment_state', 'in', ('not_paid', 'partial'))
+                        ], order='invoice_date asc, id asc')
+                        
+                        for move in unpaid_moves:
+                            if payment_line.reconciled:
+                                break
+                            try:
+                                move.js_assign_outstanding_line(payment_line.id)
+                                move.message_post(body=f"Seerbit Payment Link: Auto-reconciled payment of {amount} from standalone link.")
+                            except Exception as e:
+                                _logger.error(f"Failed to auto-reconcile payment link for invoice {move.name}: {e}")
+
+                partner.sudo()._reconcile_seerbit_payment(payment)
                     
             self.write({
                 'state': 'paid',
                 'payment_id': payment.id
             })
+            self.message_post(body=f"Seerbit Payment Link Paid: Amount {amount}, Reference: {reference}")
         else:
             # If no partner, we just mark as paid for now
             self.write({'state': 'paid'})

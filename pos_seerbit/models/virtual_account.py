@@ -7,6 +7,7 @@ _logger = logging.getLogger(__name__)
 class SeerbitVirtualAccount(models.Model):
     _name = 'seerbit.virtual.account'
     _description = 'Seerbit Virtual Account'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     
     partner_id = fields.Many2one('res.partner', string='Customer', required=True, ondelete='cascade')
     reference = fields.Char(string='VA Reference', copy=False, readonly=True)
@@ -63,6 +64,10 @@ class SeerbitVirtualAccount(models.Model):
                 va._fetch_and_process_payments(api_client)
             except Exception as e:
                 _logger.error(f"Error spooling payments for VA {va.account_number}: {e}")
+                self.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                    'title': 'Seerbit Sync Error',
+                    'message': f'Failed to sync VA {va.name or va.account_number}: {str(e)}',
+                })
 
     def _fetch_and_process_payments(self, api_client):
         self.ensure_one()
@@ -82,8 +87,10 @@ class SeerbitVirtualAccount(models.Model):
                 if existing_payment:
                     changed = False
                     if existing_payment.state == 'draft':
-                        existing_payment.action_post()
-                        changed = True
+                        auto_post = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+                        if auto_post:
+                            existing_payment.action_post()
+                            changed = True
                     if existing_payment.state == 'in_process':
                         self._reconcile_seerbit_payment(existing_payment)
                         changed = True
@@ -163,30 +170,37 @@ class SeerbitVirtualAccount(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'account.payment',
             'view_mode': 'list,form',
-            'domain': [('partner_id', '=', self.partner_id.id), ('memo', 'ilike', self.reference)],
+            'domain': [('seerbit_va_id', '=', self.id)],
             'context': {
                 'default_partner_id': self.partner_id.id,
                 'default_payment_type': 'inbound',
+                'default_seerbit_va_id': self.id,
             }
         }
 
     def _process_seerbit_va_payment(self, amount, reference):
         """Processes a VA payment: creates payment, reconciles oldest invoices."""
         partner = self.partner_id
-        journal = self.env['account.journal'].search([('type', '=', 'bank'), ('name', 'ilike', 'Seerbit')], limit=1)
-        if not journal:
-            journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
-            
-        payment_method = self.env.ref('account.account_payment_method_manual_in')
-        
-        # Peek at first unpaid invoice to grab the AR account to maximize chances of successful recon
-        dest_account_id = False
+        company = self.env.company
         unpaid_invoice = self.env['account.move'].search([
             ('partner_id', '=', partner.id),
             ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('payment_state', 'in', ['not_paid', 'partial'])
         ], order='invoice_date asc, id asc', limit=1)
+        if unpaid_invoice:
+            company = unpaid_invoice.company_id
+        elif partner.company_id:
+            company = partner.company_id
+
+        journal = self.env['account.journal'].search([('type', '=', 'bank'), ('name', 'ilike', 'Seerbit'), ('company_id', '=', company.id)], limit=1)
+        if not journal:
+            journal = self.env['account.journal'].search([('type', '=', 'bank'), ('company_id', '=', company.id)], limit=1)
+            
+        payment_method = self.env.ref('account.account_payment_method_manual_in')
+        
+        # Peek at first unpaid invoice to grab the AR account to maximize chances of successful recon
+        dest_account_id = False
         
         if unpaid_invoice:
             invoice_receivable_line = unpaid_invoice.line_ids.filtered(lambda l: l.account_id.account_type == 'asset_receivable')
@@ -200,6 +214,7 @@ class SeerbitVirtualAccount(models.Model):
             'partner_id': partner.id,
             'amount': float(amount),
             'journal_id': journal.id,
+            'company_id': company.id,
             'payment_method_line_id': payment_method_line.id,
             'memo': reference,
             'seerbit_va_id': self.id,
@@ -212,27 +227,35 @@ class SeerbitVirtualAccount(models.Model):
             payment_vals['force_outstanding_account_id'] = outstanding_acc.id
         
         payment = self.env['account.payment'].create(payment_vals)
-        payment.action_post()
-        self._reconcile_seerbit_payment(payment)
+        auto_post = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+        if auto_post:
+            payment.action_post()
         
-        # Settle oldest invoices
-        invoices = self.env['account.move'].search([
-            ('partner_id', '=', partner.id),
-            ('move_type', '=', 'out_invoice'),
-            ('state', '=', 'posted'),
-            ('payment_state', 'in', ['not_paid', 'partial'])
-        ], order='invoice_date asc, id asc')
-        
-        payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
-        
-        for invoice in invoices:
-            if not payment_lines:
-                break
-            try:
-                invoice.js_assign_outstanding_line(payment_lines[0].id)
-            except Exception:
-                pass
+        auto_reconcile = self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_reconcile', default='True') == 'True'
+        if auto_post and auto_reconcile:
+            # Settle oldest invoices
+            invoices = self.env['account.move'].search([
+                ('partner_id', '=', partner.id),
+                ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'),
+                ('payment_state', 'in', ['not_paid', 'partial'])
+            ], order='invoice_date asc, id asc')
+            
             payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+            
+            for invoice in invoices:
+                if not payment_lines:
+                    break
+                try:
+                    invoice.js_assign_outstanding_line(payment_lines[0].id)
+                    invoice.message_post(body=f"Seerbit VA: Auto-reconciled payment of {amount} from VA {self.account_number}")
+                except Exception as e:
+                    _logger.error(f"Failed to auto-reconcile VA payment for invoice {invoice.name}: {e}")
+                payment_lines = payment.move_id.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled)
+                
+            self._reconcile_seerbit_payment(payment)
+            
+        self.message_post(body=f"Seerbit Payment Received: Amount {amount}, Reference: {reference}")
 
     def _reconcile_seerbit_payment(self, payment):
         if payment.state != 'in_process':
