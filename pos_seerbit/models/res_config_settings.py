@@ -41,6 +41,16 @@ class ResConfigSettings(models.TransientModel):
                 Set your terminal credentials on the payment method configuration.""",
     )
     
+    seerbit_auto_post = fields.Boolean(
+        string="Automatically Post Payments",
+        help="Automatically post Seerbit payments to the ledger when received.",
+    )
+    
+    seerbit_auto_reconcile = fields.Boolean(
+        string="Automatic Reconciliation",
+        help="Automatically reconcile Seerbit payments with invoices when payment is received.",
+    )
+    
     # Firestore Configuration Fields (only shown when Seerbit is enabled)
     # Note: These fields are not stored in the database but managed through ir.config_parameter
     seerbit_firestore_cred = fields.Char(
@@ -108,6 +118,8 @@ class ResConfigSettings(models.TransientModel):
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_id', self.seerbit_pocket_id or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_email', self.seerbit_pocket_email or '')
         self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_pocket_password', self.seerbit_pocket_password or '')
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_auto_post', str(self.seerbit_auto_post))
+        self.env['ir.config_parameter'].sudo().set_param('pos_seerbit.seerbit_auto_reconcile', str(self.seerbit_auto_reconcile))
         
         # Log configuration changes
         if self.module_pos_seerbit:
@@ -127,6 +139,8 @@ class ResConfigSettings(models.TransientModel):
             seerbit_pocket_id=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_id', default=''),
             seerbit_pocket_email=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_email', default=''),
             seerbit_pocket_password=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_pocket_password', default=''),
+            seerbit_auto_post=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True',
+            seerbit_auto_reconcile=self.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_reconcile', default='True') == 'True',
         )
         return res
 

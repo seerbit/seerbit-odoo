@@ -123,6 +123,10 @@ class SeerbitWebhookController(http.Controller):
                         _logger.info(f"Seerbit Webhook: Processed payment link for {link.name}")
                     except Exception as e:
                         _logger.error(f"Seerbit Webhook Error processing payment link: {e}")
+                        request.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                            'title': 'Seerbit Webhook Error',
+                            'message': f'Failed to process Link payment: {str(e)}',
+                        })
                 else:
                     _logger.warning(f"Seerbit Webhook: Payment Link ID {payment_link_id} not found in DB.")
                 continue
@@ -151,7 +155,9 @@ class SeerbitWebhookController(http.Controller):
                     existing_payment = request.env['account.payment'].sudo().search([('move_id.ref', '=', reference)], limit=1)
                     if existing_payment:
                         if existing_payment.state == 'draft':
-                            existing_payment.sudo().action_post()
+                            auto_post = request.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+                            if auto_post:
+                                existing_payment.sudo().action_post()
                         if existing_payment.state == 'in_process':
                             move.partner_id.sudo()._reconcile_seerbit_payment(existing_payment)
                         _logger.info(f"Seerbit Webhook: Invoice payment {reference} already processed.")
@@ -160,11 +166,11 @@ class SeerbitWebhookController(http.Controller):
                 try:
                     # Find the Seerbit bank journal (or fallback to any bank journal)
                     journal = request.env['account.journal'].sudo().search(
-                        [('type', '=', 'bank'), ('name', 'ilike', 'Seerbit')], limit=1
+                        [('type', '=', 'bank'), ('name', 'ilike', 'Seerbit'), ('company_id', '=', move.company_id.id)], limit=1
                     )
                     if not journal:
                         journal = request.env['account.journal'].sudo().search(
-                            [('type', '=', 'bank')], limit=1
+                            [('type', '=', 'bank'), ('company_id', '=', move.company_id.id)], limit=1
                         )
 
                     payment_method = request.env.ref('account.account_payment_method_manual_in')
@@ -183,6 +189,7 @@ class SeerbitWebhookController(http.Controller):
                         'partner_id': move.partner_id.id,
                         'amount': float(amount),
                         'journal_id': journal.id,
+                        'company_id': move.company_id.id,
                         'payment_method_line_id': payment_method_line.id,
                         'memo': reference or f"Invoice {invoice_number}",
                     }
@@ -195,26 +202,31 @@ class SeerbitWebhookController(http.Controller):
 
                     payment = request.env['account.payment'].sudo().create(payment_vals)
                     # Post the payment (draft → posted)
-                    payment.action_post()
+                    auto_post = request.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+                    if auto_post:
+                        payment.action_post()
 
                     # Auto-reconcile: match payment receivable lines with invoice receivable lines
-                    payment_lines = payment.move_id.line_ids.filtered(
-                        lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled
-                    )
-                    if payment_lines:
-                        try:
-                            move.js_assign_outstanding_line(payment_lines[0].id)
-                        except Exception as e:
-                            _logger.error(f"Failed to auto-reconcile payment for invoice {move.name}: {e}")
-
-                    # Force bank statement reconciliation so payment state becomes 'paid'
-                    if payment.state == 'in_process':
-                        move.partner_id.sudo()._reconcile_seerbit_payment(payment)
+                    auto_reconcile = request.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_reconcile', default='True') == 'True'
+                    if auto_post and auto_reconcile:
+                        payment_lines = payment.move_id.line_ids.filtered(
+                            lambda line: line.account_id.account_type == 'asset_receivable' and not line.reconciled
+                        )
+                        if payment_lines:
+                            try:
+                                move.js_assign_outstanding_line(payment_lines[0].id)
+                            except Exception as e:
+                                _logger.error(f"Failed to auto-reconcile payment for invoice {move.name}: {e}")
+    
+                        # Force bank statement reconciliation so payment state becomes 'paid'
+                        if payment.state == 'in_process':
+                            move.partner_id.sudo()._reconcile_seerbit_payment(payment)
 
                     # Update the Seerbit status on the invoice record
                     move.sudo().write({
                         'seerbit_invoice_status': 'PAID',
                     })
+                    move.message_post(body=f"Seerbit Webhook: Invoice marked as PAID. Amount: {amount}, Ref: {invoice_number}")
 
                     # Notify all logged-in users via bus broadcast
                     request.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
@@ -224,6 +236,10 @@ class SeerbitWebhookController(http.Controller):
                     _logger.info(f"Seerbit Webhook: Processed invoice payment for {move.name} ({invoice_number})")
                 except Exception as e:
                     _logger.error(f"Seerbit Webhook Error processing invoice payment for {invoice_number}: {e}", exc_info=True)
+                    request.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                        'title': 'Seerbit Webhook Error',
+                        'message': f'Failed to process Invoice {invoice_number}: {str(e)}',
+                    })
                 continue
 
             # SECTION 3: Virtual Account (VA) Payments
@@ -242,8 +258,10 @@ class SeerbitWebhookController(http.Controller):
                     if existing_payment:
                         # Post draft payments that were created but not yet confirmed
                         if existing_payment.state == 'draft':
-                            _logger.info(f"Seerbit Webhook: Found existing pending payment {reference}. Posting it...")
-                            existing_payment.sudo().action_post()
+                            auto_post = request.env['ir.config_parameter'].sudo().get_param('pos_seerbit.seerbit_auto_post', default='True') == 'True'
+                            if auto_post:
+                                _logger.info(f"Seerbit Webhook: Found existing pending payment {reference}. Posting it...")
+                                existing_payment.sudo().action_post()
                         # Reconcile in-process payments with bank statement
                         if existing_payment.state == 'in_process':
                             va.sudo()._reconcile_seerbit_payment(existing_payment)
@@ -262,6 +280,10 @@ class SeerbitWebhookController(http.Controller):
                     _logger.info(f"Seerbit Webhook: Processed payment of {amount} for {va.partner_id.name}")
                 except Exception as e:
                     _logger.error(f"Seerbit Webhook Error processing payment: {e}")
+                    request.env['bus.bus'].sudo()._sendone('broadcast', 'seerbit_payment_received', {
+                        'title': 'Seerbit Webhook Error',
+                        'message': f'Failed to process VA payment: {str(e)}',
+                    })
 
             # ===========================================================
             # Unrecognized payload — no paymentLinkId, invoiceNumber, or accountNumber
