@@ -222,8 +222,7 @@ class PosPaymentMethod(models.Model):
         copy=False
     )
     seerbit_latest_response = fields.Char(
-        copy=False, 
-        groups="base.group_erp_manager"
+        copy=False
     )  # used to buffer the latest asynchronous notification from Seerbit.
     
     def _get_payment_terminal_selection(self):
@@ -234,7 +233,7 @@ class PosPaymentMethod(models.Model):
     @api.model
     def _load_pos_data_fields(self, config_id):
        data = super()._load_pos_data_fields(config_id)
-       data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
+       data += ['seerbit_terminal_id','seerbit_public_key']
        return data
     @api.constrains("seerbit_terminal_id")
     def _check_seerbit_autoconfirm(self):
