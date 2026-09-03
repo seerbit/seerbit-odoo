@@ -8,7 +8,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//form" position="inside">
                     <app string="Seerbit" name="pos_seerbit">
-                        <block title="Seerbit Configuration" name="seerbit_config">
+                        <block title="General" name="seerbit_general">
                             <setting string="Enable Seerbit Payment Terminal">
                                 <field name="module_pos_seerbit"/>
                                 <div class="text-muted">
@@ -24,7 +24,44 @@
                             <setting string="Seerbit Firestore Service Account JSON" invisible="not module_pos_seerbit">
                                 <field name="seerbit_firestore_cred" widget="text" placeholder='{"type": "service_account", "project_id": "..."}'/>
                                 <div class="text-muted mt8">
-                                    Paste the entire content of your Firestore service account JSON file here.
+                                    Shared Firestore credentials for POS push notifications.
+                                </div>
+                            </setting>
+                        </block>
+
+                        <block name="seerbit_business" invisible="not module_pos_seerbit">
+                            <setting colspan="2">
+                                <field name="seerbit_business_config_title" readonly="1" nolabel="1"
+                                       class="h5 fw-bold mb-2 border-0 bg-transparent p-0"/>
+                                <div class="text-muted mb-3">
+                                    Switch company in the header to configure another branch.
+                                </div>
+                            </setting>
+                            <setting string="Seerbit Public Key">
+                                <field name="seerbit_public_key" placeholder="YOUR_PUBLIC_KEY"/>
+                            </setting>
+                            <setting string="Seerbit Secret Key">
+                                <field name="seerbit_secret_key" placeholder="YOUR_SECRET_KEY" password="True"/>
+                            </setting>
+                            <setting string="Seerbit Pocket ID">
+                                <field name="seerbit_pocket_id" placeholder="SBP..."/>
+                            </setting>
+                            <setting string="Seerbit Pocket Email">
+                                <field name="seerbit_pocket_email" placeholder="merchant@domain.com"/>
+                            </setting>
+                            <setting string="Seerbit Pocket Password">
+                                <field name="seerbit_pocket_password" placeholder="••••••••" password="True"/>
+                            </setting>
+                            <setting string="Automatically Post Payments">
+                                <field name="seerbit_auto_post"/>
+                                <div class="text-muted">
+                                    Post Seerbit payments to the ledger when received for this branch.
+                                </div>
+                            </setting>
+                            <setting string="Automatic Reconciliation" invisible="not seerbit_auto_post">
+                                <field name="seerbit_auto_reconcile"/>
+                                <div class="text-muted">
+                                    Reconcile Seerbit payments with invoices for this branch.
                                 </div>
                             </setting>
                         </block>
@@ -34,5 +71,12 @@
         </record>
     </data>
 
-    
+    <record id="action_pos_seerbit_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module' : 'pos_seerbit', 'bin_size': False}</field>
+    </record>
+
 </odoo>

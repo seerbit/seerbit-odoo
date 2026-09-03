@@ -1,60 +1,60 @@
 /** @odoo-module **/
 
-import { PaymentScreen } from '@point_of_sale/app/screens/payment_screen/payment_screen';
-import { patch } from '@web/core/utils/patch';
-import { onWillUnmount } from '@odoo/owl';
-
-// Odoo 19 wires terminals via register_payment_method → pos.payment.method.payment_terminal.
-// Core PaymentScreen.sendPaymentRequest uses line.pay() → terminal.sendPaymentRequest → handlePaymentResponse.
-// Only extend what core does not do: Seerbit cleanup on force-done and when leaving the screen.
+import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
+import { patch } from "@web/core/utils/patch";
+import { onMounted, onWillUnmount } from "@odoo/owl";
 
 patch(PaymentScreen.prototype, {
     setup() {
-        super.setup();
-        onWillUnmount(() => {
-            this.paymentLines.forEach((line) => {
-                if (
-                    line.payment_method_id?.use_payment_terminal === 'seerbit' &&
-                    line.payment_method_id.payment_terminal
-                ) {
-                    line.payment_method_id.payment_terminal.close();
-                }
-            });
-            // Ensure paymentTerminalInProgress is reset when leaving the screen
-            this.pos.paymentTerminalInProgress = false;
+        super.setup(...arguments);
+        onMounted(() => {
+            const pendingPaymentLine = this.pos.getPendingPaymentLine("seerbit");
+            if (pendingPaymentLine) {
+                pendingPaymentLine.setPaymentStatus("waitingSeerbit");
+            }
         });
 
-        // New logic to resume reconciliation for pending Seerbit payment lines
-        this.paymentLines.forEach((line) => {
-            if (
-                line.payment_method_id?.use_payment_terminal === 'seerbit' &&
-                ['waiting', 'waitingCard', 'waitingCapture'].includes(line.payment_status)
-            ) {
-                // Set paymentTerminalInProgress to true to disable other payment methods
-                this.pos.paymentTerminalInProgress = true;
-                // Re-initiate the reconciliation listener by calling sendPaymentRequest
-                if (line.payment_method_id.payment_terminal) {
-                    line.payment_method_id.payment_terminal.sendPaymentRequest(line.uuid);
+        onWillUnmount(() => {
+            this.paymentLines.forEach((line) => {
+                if (line.payment_method_id.use_payment_terminal === "seerbit") {
+                    line.payment_method_id.payment_terminal?.close?.();
                 }
-            }
+            });
         });
     },
 
     async sendForceDone(line) {
-        if (
-            line.payment_method_id?.use_payment_terminal === 'seerbit' &&
-            line.payment_method_id.payment_terminal?.sendForceDone
-        ) {
-            await line.payment_method_id.payment_terminal.sendForceDone(line);
-            return;
+        const payment_terminal = line.payment_method_id.payment_terminal;
+        if (payment_terminal?.sendForceDone) {
+            await payment_terminal.sendForceDone(line);
         }
-        await super.sendForceDone(line);
+        return super.sendForceDone(line);
     },
 
     paymentMethodImage(id) {
-        if (this.paymentMethod && this.paymentMethod.use_payment_terminal === 'seerbit') {
-            return '/pos_seerbit/static/description/icon.png';
+        const method = this.payment_methods_from_config.find((m) => m.id === id);
+        if (method?.use_payment_terminal === "seerbit") {
+            return "/pos_seerbit/static/description/icon.png";
         }
         return super.paymentMethodImage(id);
+    },
+
+    deletePaymentLine(uuid) {
+        const line = this.paymentLines.find((paymentLine) => paymentLine.uuid === uuid);
+        if (
+            line &&
+            ["waitingSeerbit", "errorSeerbit"].includes(line.getPaymentStatus()) &&
+            line.payment_method_id.payment_terminal
+        ) {
+            line.setPaymentStatus("waitingCancel");
+            line.payment_method_id.payment_terminal
+                .sendPaymentCancel(this.currentOrder, uuid)
+                .then(() => {
+                    this.currentOrder.removePaymentline(line);
+                    this.numberBuffer.reset();
+                });
+            return;
+        }
+        return super.deletePaymentLine(uuid);
     },
 });

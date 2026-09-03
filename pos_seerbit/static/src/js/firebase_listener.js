@@ -1,107 +1,109 @@
 /** @odoo-module **/
 
+import { _t } from '@web/core/l10n/translation';
+import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
 import FirebaseInit from './firebase_init';
 
-const SUCCESS_STATUSES = ['success', 'completed', 'complete', 'done', 'successful'];
+// Track active listeners to prevent duplicates
+const activeListeners = new Map();
 
-function isSuccessStatus(status) {
-    return status && SUCCESS_STATUSES.includes(String(status).toLowerCase());
-}
+// Listen for payment reconciliation updates
+function listenForReconciliation(transactionId, env) {
+    // If we already have a listener for this transaction, don't create another one
+    if (activeListeners.has(transactionId)) {
+        console.log('Listener already exists for transaction:', transactionId);
+        return;
+    }
 
-/**
- * Wait until Firestore has a reconciliation doc matching order id + terminal posid.
- * No localStorage — caller applies the resolved data to the active payment line after verification.
- *
- * @param {string} orderId - Order id from payload (order uuid)
- * @param {string} posid - Terminal id
- * @param {Object} [options]
- * @param {function} [options.onReady] - (unsubscribe, rejectOnce) => void
- * @param {{ cancelled?: boolean }} [options.cancelRef]
- * @returns {Promise<Object>} reconciliation document fields
- */
-function waitForReconciliationByOrderId(orderId, posid, options) {
-    options = options || {};
-    const onReady = options.onReady || function () {};
-    const cancelRef = options.cancelRef || { cancelled: false };
-
-    return new Promise(function (resolve, reject) {
+    const initializeListener = () => {
         if (!FirebaseInit.isFirebaseAvailable()) {
-            reject(new Error('Firestore not available'));
+            console.warn('Firestore not available for reconciliation. Status:', FirebaseInit.getFirebaseStatus());
+            FirebaseInit.reinitializeFirebase(window.__owl__.root.env.services.orm).then(function(success) {
+                if (success) {
+                    initializeListener();
+                } else {
+                    console.error('Failed to reinitialize Firestore');
+                }
+            });
             return;
         }
 
         const firestoreDb = FirebaseInit.getFirestoreDb();
         if (!firestoreDb) {
-            reject(new Error('Firestore database not available'));
+            console.warn('Firestore database not available for reconciliation');
             return;
         }
 
-        let settled = false;
-        let unsubscribe = null;
-        let isFirstSnapshot = true;
+        // Query without orderBy to avoid composite index requirement
+        const reconciliationsRef = firestoreDb.collection('reconciliations')
+            .where('id', '==', transactionId)
+            .limit(1);
 
-        function finish(err, data) {
-            if (settled) {
-                return;
-            }
-            settled = true;
-            if (unsubscribe) {
-                unsubscribe();
-            }
-            if (err) {
-                reject(err);
-            } else {
-                resolve(data);
-            }
-        }
-
-        function rejectOnce(err) {
-            if (settled) {
-                return;
-            }
-            settled = true;
-            if (unsubscribe) {
-                unsubscribe();
-            }
-            reject(err);
-        }
-
-        const reconciliationsRef = firestoreDb.collection('reconciliations');
-        unsubscribe = reconciliationsRef.onSnapshot(
-            function (snapshot) {
-                if (cancelRef.cancelled) {
-                    rejectOnce(new Error('cancelled'));
+        const unsubscribe = reconciliationsRef.onSnapshot(
+            async (snapshot) => {
+                if (snapshot.empty) {
+                    console.log('No matching transaction found for ID:', transactionId);
                     return;
                 }
-                if (isFirstSnapshot) {
-                    isFirstSnapshot = false;
-                    return;
-                }
-                snapshot.docChanges().forEach(function (change) {
-                    if (change.type !== 'added' && change.type !== 'modified') {
-                        return;
-                    }
-                    const data = change.doc.data();
-                    if (
-                        String(data?.id) === String(orderId) &&
-                        String(data?.posid) === String(posid) &&
-                        isSuccessStatus(data?.status)
-                    ) {
-                        finish(null, data);
+
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        const pending = JSON.parse(localStorage.getItem('pending_transaction') || 'null');
+                        console.log('Payment reconciliation data received:', data);
+                        
+                        // Validate the transaction matches our pending one
+                        if (pending && data?.id === pending?.id && data?.posid === pending?.posid ) {
+                            const status = String(data?.status || '').toLowerCase();
+                            if (['success', 'completed', 'complete', 'done', 'successful'].includes(status)) {
+                                // Store the completed transaction
+                                localStorage.setItem('completed_transaction', JSON.stringify(data));
+                                console.log('Payment reconciliation completed successfully');
+                                
+                                // Clean up the listener after successful processing
+                                cleanupListener(transactionId);
+                            }
+                        }
                     }
                 });
             },
-            function (error) {
-                console.error('Firestore reconciliation listener error:', error);
-                finish(error || new Error('Listener error'));
+            (error) => {
+                console.error('Firestore listener error:', error);
+                cleanupListener(transactionId);
             }
         );
 
-        onReady(unsubscribe, rejectOnce);
-    });
+        // Store the unsubscribe function
+        activeListeners.set(transactionId, unsubscribe);
+    };
+
+    initializeListener();
+}
+
+// Clean up a listener by transaction ID
+function cleanupListener(transactionId) {
+    const unsubscribe = activeListeners.get(transactionId);
+    if (unsubscribe) {
+        unsubscribe();
+        activeListeners.delete(transactionId);
+        console.log('Cleaned up listener for transaction:', transactionId);
+    }
+}
+
+// Clean up all listeners
+function cleanupAllListeners() {
+    for (const [id, unsubscribe] of activeListeners.entries()) {
+        unsubscribe();
+        console.log('Cleaned up listener for transaction:', id);
+    }
+    activeListeners.clear();
+}
+
+// Clean up on page unload
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', cleanupAllListeners);
 }
 
 export default {
-    waitForReconciliationByOrderId,
-    isSuccessStatus,
+    listenForReconciliation
 };
