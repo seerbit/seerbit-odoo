@@ -1,279 +1,219 @@
 /** @odoo-module **/
 
-import { PaymentInterface } from '@point_of_sale/app/utils/payment/payment_interface';
-import { register_payment_method } from '@point_of_sale/app/services/pos_store';
-import { _t } from '@web/core/l10n/translation';
-import { AlertDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
-import FirebaseInit from './firebase_init';
-import FirebaseListener from './firebase_listener';
+import { PaymentInterface } from "@point_of_sale/app/utils/payment/payment_interface";
+import { _t } from "@web/core/l10n/translation";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import FirebaseInit from "./firebase_init";
+import FirebaseListener from "./firebase_listener";
 
 function initializeSeerbitFirebase(orm) {
     FirebaseInit.initializeFirebase(orm)
-        .then(function (success) {
+        .then((success) => {
             if (!success) {
                 console.warn(
-                    'Firestore initialization failed for Seerbit payments. Status:',
+                    "Firestore initialization failed for Seerbit payments. Status:",
                     FirebaseInit.getFirebaseStatus()
                 );
             }
         })
-        .catch(function (error) {
-            console.error('Firestore initialization error:', error);
+        .catch((error) => {
+            console.error("Firestore initialization error:", error);
         });
 }
 
 export default class SeerbitPayment extends PaymentInterface {
     setup() {
         super.setup(...arguments);
+        this.seerbit_polling = null;
         this.seerbit_was_cancelled = false;
         this.supports_reversals = false;
-        this._reconciliationUnsubscribe = null;
-        this._reconciliationReject = null;
-        this._seerbit_cancel_ref = null;
         initializeSeerbitFirebase(this.env.services.orm);
     }
 
-    get fastPayments() {
-        return true;
-    }
-
-    /**
-     * Resolve the payment line that must receive reconciliation — always from the current POS order.
-     */
-    _getActiveSeerbitLine(lineUuid) {
-        const order = this.pos.getOrder();
-        if (!order || !lineUuid) {
-            return null;
-        }
-        return order.payment_ids.find((pl) => pl.uuid === lineUuid) || null;
-    }
-
-    /**
-     * Verify Firestore doc against expected ids and the live line amount; then mark done.
-     */
-    _markPaymentSuccessful(line, data, expectedOrderId, expectedPosid) {
-        const docId = String(data?.id ?? '');
-        const docPosid = String(data?.posid ?? '');
-        let meta = {};
-        try {
-            meta = data?.metadata ? JSON.parse(data.metadata) : {};
-        } catch (e) {
-            meta = {};
-        }
-        const docAmount = parseFloat(meta.odoo_amount != null ? meta.odoo_amount : 0);
-        const lineAmount = parseFloat(line.getAmount ? line.getAmount() : line.amount || 0);
-
-        if (docId !== String(expectedOrderId) || docPosid !== String(expectedPosid)) {
-            throw new Error('Reconciliation doc does not match order');
-        }
-        if (Math.abs(docAmount - lineAmount) > 0.01) {
-            throw new Error('Reconciliation amount does not match order line');
-        }
-
-        const transactionId = data?.sessionId || data?.transactionRef || data?.id || '';
-        line.setReceiptInfo('Transaction ID: ' + transactionId);
-        line.transaction_id = transactionId;
-        line.card_type = 'Seerbit';
-        line.cardholder_name = 'Seerbit Payment';
-
-        line.setPaymentStatus('done'); // Mark the payment line as done
-
-        setTimeout(() => {
-            this.env.services.dialog.add(AlertDialog, {
-                title: _t('Payment Successful'),
-                body: _t('Payment has been successfully processed.'),
-            });
-        }, 0);
-        return true;
-    }
-
     async sendPaymentRequest(uuid) {
+        super.sendPaymentRequest(uuid);
         const order = this.pos.getOrder();
-        if (!order) {
-            console.error('Order not found in sendPaymentRequest for uuid:', uuid);
-            return false;
-        }
-        const line = order.payment_ids.find((paymentLine) => paymentLine.uuid === uuid);
-        if (!line) {
-            console.error('Payment line not found for uuid:', uuid);
-            return false;
-        }
-        if (line.amount < 0.01) {
+        const paymentLine = order.getSelectedPaymentline();
+        if (paymentLine.getAmount() < 0.01) {
             await this.env.services.dialog.add(AlertDialog, {
-                title: _t('Amount Error'),
-                body: _t('Cannot process transactions with invalid amount.'),
+                title: _t("Amount Error"),
+                body: _t("Cannot process transactions with invalid amount."),
             });
             return false;
         }
-        line.setPaymentStatus('waiting');
-        return this._send_seerbit_payment_request_to_firestore(line);
+        paymentLine.setPaymentStatus("waitingSeerbit");
+        return this._send_seerbit_payment_request_to_firestore(paymentLine);
     }
 
     async sendPaymentCancel(order, uuid) {
+        super.sendPaymentCancel(order, uuid);
         this.seerbit_was_cancelled = true;
-        if (this._reconciliationUnsubscribe) {
-            this._reconciliationUnsubscribe();
-            this._reconciliationUnsubscribe = null;
-        }
-        if (this._reconciliationReject) {
-            this._reconciliationReject(new Error('cancelled'));
-            this._reconciliationReject = null;
-        }
-        if (this._seerbit_cancel_ref) {
-            this._seerbit_cancel_ref.cancelled = true;
-        }
         this._reset_seerbit_state();
         return true;
     }
 
     _seerbit_pay_data(paymentLine) {
         const order = this.pos.getOrder();
-        const paymentMethod = paymentLine.payment_method_id;
-        const orderId = order?.uuid || order?.id;
-
+        const paymentMethod = this.payment_method_id;
         const now = new Date();
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(now.getMonth() + 1).padStart(2, "0");
         const year = now.getFullYear();
-        const hour = String(now.getHours()).padStart(2, '0');
-        const minute = String(now.getMinutes()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, "0");
+        const minute = String(now.getMinutes()).padStart(2, "0");
         const receivedDateTime = `${day}/${month}/${year} ${hour}:${minute}`;
-        const amountStr =
-            paymentLine.getAmount != null
-                ? paymentLine.getAmount().toFixed(2)
-                : Number(paymentLine.amount || 0).toFixed(2);
-
         const metadata = JSON.stringify({
-            created_by: 'odoo_pos_seerbit',
+            created_by: "odoo_pos_seerbit",
             created_time: now.toISOString(),
-            order_id: orderId,
+            order_id: order?.uuid || order?.id,
             pos_config_id: this.pos.config?.id,
             user_id: this.pos.user?.id,
-            odoo_amount: amountStr,
         });
-
         return {
-            id: String(orderId),
-            posid: paymentMethod?.seerbit_terminal_id || '',
-            merchantid: '',
-            metadata,
-            transactionValue: amountStr,
-            status: 'open',
-            transactionTime: '',
-            sessionId: '',
-            receivedDateTime,
-            transactionRef: '',
-            pubkey: paymentMethod?.seerbit_public_key || '',
+            id: order?.uuid || order?.id,
+            posid: paymentMethod?.seerbit_terminal_id || "",
+            merchantid: "",
+            metadata: metadata,
+            transactionValue: paymentLine.getAmount()?.toFixed(2),
+            status: "open",
+            transactionTime: "",
+            sessionId: "",
+            receivedDateTime: receivedDateTime,
+            transactionRef: "",
+            pubkey: paymentMethod?.seerbit_public_key || "",
         };
     }
 
     _send_seerbit_payment_request_to_firestore(paymentLine) {
-        const self = this;
         let payload;
         try {
-            payload = self._seerbit_pay_data(paymentLine);
+            payload = this._seerbit_pay_data(paymentLine);
         } catch (error) {
-            console.error('Error creating payment payload:', error);
+            console.error("Error creating payment payload:", error);
             return Promise.reject(error);
         }
         if (!paymentLine.payment_method_id?.id) {
-            return Promise.resolve(false);
+            return false;
         }
 
-        const lineUuid = paymentLine.uuid;
-        const expectedOrderId = payload.id;
-        const expectedPosid = payload.posid;
-
-        self._reset_seerbit_state();
-        self._seerbit_cancel_ref = { cancelled: false };
-
-        return self.env.services.orm
+        return this.env.services.orm
             .call(
-                'pos.payment.method',
-                'send_seerbit_payment_request',
+                "pos.payment.method",
+                "send_seerbit_payment_request",
                 [[paymentLine.payment_method_id.id], payload],
                 {}
             )
-            .then(function () {
-                console.log('[Seerbit] Payment request sent, waiting for Firestore reconciliation');
-                return FirebaseListener.waitForReconciliationByOrderId(expectedOrderId, expectedPosid, {
-                    cancelRef: self._seerbit_cancel_ref,
-                    onReady: function (unsubscribe, rejectOnce) {
-                        self._reconciliationUnsubscribe = unsubscribe;
-                        self._reconciliationReject = rejectOnce;
-                    },
-                }).then(function (data) {
-                    const line = self._getActiveSeerbitLine(lineUuid);
-                    const order = self.pos.getOrder();
-                    if (!line || !order) {
-                        throw new Error('No pending payment line');
-                    }
-                    if (String(order.uuid || order.id) !== String(expectedOrderId)) {
-                        throw new Error('Order changed during reconciliation');
-                    }
-                    self._markPaymentSuccessful(line, data, expectedOrderId, expectedPosid);
-                    return true;
-                });
+            .then(() => {
+                localStorage.setItem("pending_transaction", JSON.stringify(payload));
+                FirebaseListener.listenForReconciliation(payload.id, this.env);
+                return this._seerbit_start_get_status_polling(paymentLine);
             })
-            .catch(async function (error) {
-                const line = self._getActiveSeerbitLine(lineUuid);
-                const msg = error && error.message;
-                // User removed line / cancelled terminal — must resolve (false), not reject, or line.pay() throws.
-                if (msg === 'cancelled') {
-                    if (line && line.getPaymentStatus && line.getPaymentStatus() !== 'waitingCancel') {
-                        line.setPaymentStatus('waitingCancel');
-                    }
-                    return false;
+            .catch(async (error) => {
+                console.error("Payment request failed:", error);
+                if (paymentLine?.setPaymentStatus) {
+                    paymentLine.setPaymentStatus("waitingSeerbit");
                 }
-                console.error('[Seerbit] Payment / reconciliation failed:', error);
-                if (line) {
-                    line.setPaymentStatus('retry');
-                }
-                await self.env.services.dialog.add(AlertDialog, {
-                    title: _t('Seerbit'),
-                    body:
-                        msg || _t('Could not confirm payment. You can retry or force done if the customer paid.'),
+                await this.env.services.dialog.add(AlertDialog, {
+                    title: _t("Seerbit Warning"),
+                    body: _t("Could not send payment request. You can force confirm if payment was made."),
                 });
                 return false;
-            })
-            .finally(function () {
-                self._reconciliationUnsubscribe = null;
-                self._reconciliationReject = null;
-                self._seerbit_cancel_ref = null;
-                self.seerbit_was_cancelled = false;
-                if (self.pos) {
-                    self.pos.paymentTerminalInProgress = false;
-                }
             });
+    }
+
+    _seerbit_start_get_status_polling(paymentLine) {
+        const self = this;
+        return new Promise((resolve, reject) => {
+            clearInterval(self.seerbit_polling);
+            self._seerbit_poll_for_response(paymentLine, resolve, reject);
+            self.seerbit_polling = setInterval(() => {
+                self._seerbit_poll_for_response(paymentLine, resolve, reject);
+            }, 3500);
+        }).finally(() => {
+            self._reset_seerbit_state();
+        });
+    }
+
+    async _seerbit_poll_for_response(paymentLine, resolve, reject) {
+        if (this.seerbit_was_cancelled) {
+            paymentLine.setPaymentStatus("retry");
+            this._reset_seerbit_state();
+            return reject();
+        }
+
+        const order = this.pos.getOrder();
+        if (!order || !order.getSelectedPaymentline()) {
+            return;
+        }
+
+        try {
+            const completedTransaction = localStorage.getItem("completed_transaction");
+            if (!completedTransaction) {
+                return;
+            }
+
+            const transactionData = JSON.parse(completedTransaction);
+            const pendingTransaction = JSON.parse(localStorage.getItem("pending_transaction") || "{}");
+            if (pendingTransaction && pendingTransaction.id !== transactionData.id) {
+                console.warn("Transaction ID mismatch, ignoring stale transaction");
+                localStorage.removeItem("completed_transaction");
+                return;
+            }
+
+            paymentLine.setPaymentStatus("done");
+            const transactionId =
+                transactionData?.sessionId || transactionData?.transactionRef || transactionData.id;
+            paymentLine.setReceiptInfo("Transaction ID: " + transactionId);
+            paymentLine.transaction_id = transactionId;
+            paymentLine.card_type = "Seerbit";
+            paymentLine.cardholder_name = "Seerbit Payment";
+
+            this.env.services.dialog.add(AlertDialog, {
+                title: _t("Payment Successful"),
+                body: _t("Payment has been successfully processed."),
+            });
+
+            resolve(true);
+        } catch (error) {
+            console.error("Error processing payment response:", error);
+            this._reset_seerbit_state();
+
+            if (paymentLine) {
+                paymentLine.setPaymentStatus("errorSeerbit");
+            }
+
+            this.env.services.dialog.add(AlertDialog, {
+                title: _t("Payment Error"),
+                body: _t("An error occurred while processing your payment. Please try again."),
+            });
+
+            reject();
+        }
     }
 
     _reset_seerbit_state() {
-        if (this._reconciliationUnsubscribe) {
-            this._reconciliationUnsubscribe();
+        clearInterval(this.seerbit_polling);
+        this.seerbit_polling = null;
+        this.seerbit_was_cancelled = false;
+        localStorage.removeItem("pending_transaction");
+        localStorage.removeItem("completed_transaction");
+        if (this.pos) {
+            this.pos.paymentTerminalInProgress = false;
         }
-        this._reconciliationUnsubscribe = null;
-        this._reconciliationReject = null;
-        if (this._seerbit_cancel_ref) {
-            this._seerbit_cancel_ref.cancelled = true;
-        }
-        this._seerbit_cancel_ref = null;
     }
 
     async sendForceDone(line) {
-        if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === 'seerbit') {
-            line.setPaymentStatus('done');
+        if (line && line.payment_method_id && line.payment_method_id.use_payment_terminal === "seerbit") {
+            line.setPaymentStatus("done");
             line.setReceiptInfo(
-                'Transaction ID: ' + String(line.pos_order_id?.uuid || line.order_id?.uuid || '')
+                "Transaction ID: " + (line.pos_order_id?.uuid || "").toString()
             );
             this._reset_seerbit_state();
-
             await this.env.services.dialog.add(AlertDialog, {
-                title: _t('Seerbit Payment'),
-                body: _t('Payment forcibly confirmed as done.'),
+                title: "Seerbit Payment",
+                body: "Payment forcibly confirmed as done.",
             });
             this.pos.paymentTerminalInProgress = false;
-
-            return Promise.resolve();
         }
     }
 
@@ -282,5 +222,3 @@ export default class SeerbitPayment extends PaymentInterface {
         this._reset_seerbit_state();
     }
 }
-
-register_payment_method('seerbit', SeerbitPayment);
