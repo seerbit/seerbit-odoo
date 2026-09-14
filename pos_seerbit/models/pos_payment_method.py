@@ -6,12 +6,10 @@ import random
 import string
 import warnings
 import sys
-import requests
+import threading
 
 # Set up logging first
 _logger = logging.getLogger(__name__)
-
-FALLBACK_ENDPOINT = "https://posnotification.seerbitapi.com/"
 
 # Suppress all warnings from firebase_admin before importing
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -29,8 +27,8 @@ try:
     
     # Check firebase-admin version for compatibility
     try:
-        import pkg_resources
-        firebase_version = pkg_resources.get_distribution("firebase-admin").version
+        from importlib.metadata import version as pkg_version
+        firebase_version = pkg_version("firebase-admin")
         _logger.info("Firebase Admin SDK version: %s", firebase_version)
     except Exception:
         _logger.info("Firebase Admin SDK version: unknown")
@@ -43,13 +41,15 @@ except ImportError as e:
     _logger.warning("Firebase Admin SDK not available: %s", str(e))
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
 from werkzeug.exceptions import Forbidden
 
 from odoo.addons.pos_seerbit.utils import format_erp_ref
 
 # Initialize Firestore only once
 _firestore_initialized = False
+
+# Persistent HTTP Session Pool for rapid Seerbit requests
+_session = None
 
 def initialize_firestore(env):
     """Initialize Firestore with proper error handling"""
@@ -66,9 +66,8 @@ def initialize_firestore(env):
     try:
         # Get Firestore config from Odoo settings
         config = env['ir.config_parameter'].sudo()
-        # Odoo 19: New API with default parameter support
-        cred_json = config.get_param('pos_seerbit.seerbit_firestore_cred', default=None)
-        project_id = config.get_param('pos_seerbit.seerbit_firestore_project_id', default=None)
+        cred_json = config.get_param('pos_seerbit.seerbit_firestore_cred')
+        project_id = config.get_param('pos_seerbit.seerbit_firestore_project_id')
 
         if not cred_json or not project_id:
             _logger.warning("Firestore configuration not available in settings. Skipping initialization.")
@@ -111,44 +110,55 @@ def initialize_firestore(env):
         _logger.warning("Failed to initialize Firestore: %s", str(e))
         return False
 
-# Firestore initialization is deferred until first use
-# when a payment method is accessed
-
 
 # -------------------------------------------------------
 #       FALLBACK METHOD FOR API SEND
 # -------------------------------------------------------    
 
-def _send_to_fallback(env, payload):
-    """
-    POST JSON payload to fallback endpoint when Firestore is unavailable.
-    """
+def _send_to_fallback(payload):
+    from ..services.seerbit_api import SeerbitAPI
+    return SeerbitAPI.send_pos_fallback(payload)
 
-    try:
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(FALLBACK_ENDPOINT, json=payload, headers=headers, timeout=30)
-
-        if response.status_code in (200, 201):
-            _logger.info("Payload sent to fallback endpoint successfully: %s", payload)
+def _sync_firestore_or_fallback(firestore_payload):
+    """
+    Core logic to send to Firestore, or fallback to HTTP.
+    Runs inside the thread so it can be monitored with a timeout.
+    """
+    # ---------- CASE 1: FIRESTORE SDK AVAILABLE ----------
+    if FIRESTORE_AVAILABLE and _firestore_initialized:
+        try:
+            _logger.info('Sending payment request to Firestore: %s', firestore_payload.get('id'))
+            
+            # Get Firestore client
+            db = firestore.client()
+            
+            # Add to transactions collection
+            doc_ref = db.collection('transactions').document()
+            doc_ref.set(firestore_payload)
+            
+            _logger.info('Sent payment request to Firestore successfully. Document ID: %s', doc_ref.id)
             return True
-
-        else:
-            _logger.error(
-                "Fallback endpoint returned error %s: %s",
-                response.status_code, response.text
-            )
-            return False
-
-    except Exception as e:
-        _logger.error("Failed to send to fallback endpoint: %s", str(e))
-        return False
-
+        except Exception as e:
+            _logger.error("Failed to send payment request to Firestore: %s", str(e))
+            _logger.warning("Falling back to endpoint...")
+            return _send_to_fallback(firestore_payload)
+    # ---------- CASE 2: FIRESTORE SDK NOT AVAILABLE ----------
+    else:
+        _logger.warning("Firestore SDK not initialized. Using fallback endpoint...")
+        return _send_to_fallback(firestore_payload)
 
 def send_to_firestore_transactions(env, payload):
     """
     Attempts to send the firestore_payload to Firestore if Firebase SDK exists.
     If FIRESTORE_AVAILABLE is False, automatically POST to fallback endpoint.
+    
+    Waits synchronously for up to 5 seconds. If the process exceeds 5 seconds,
+    it detaches and lets the transmission finish in the background.
     """
+    # Initialize firestore dynamically (synchronous, uses Odoo env cursor safely)
+    initialize_firestore(env)
+    
+    # Ensure all values are stringified and add server timestamp
     firestore_payload = {
         'id': str(payload.get('id', '')),
         'posid': str(payload.get('posid', '')),
@@ -162,84 +172,67 @@ def send_to_firestore_transactions(env, payload):
         'transactionRef': str(payload.get('transactionRef', '')),
         'pubkey': str(payload.get('pubkey', '')),
     }
-
-    if not FIRESTORE_AVAILABLE:
-        _logger.warning("Firebase Admin SDK not installed. Using fallback endpoint...")
-        return _send_to_fallback(env, firestore_payload)
-
-    # Must initialize before firestore.client() or: "The default Firebase app does not exist"
-    if not initialize_firestore(env):
+    
+    # Spawn thread to handle network calls
+    thread = threading.Thread(
+        target=_sync_firestore_or_fallback,
+        args=(firestore_payload,),
+        daemon=True
+    )
+    thread.start()
+    
+    # Wait synchronously for up to 5 seconds
+    thread.join(timeout=5.0)
+    
+    if thread.is_alive():
         _logger.warning(
-            "Firestore not initialized (missing/invalid credentials or settings). Using fallback endpoint..."
+            "Payment request transmission exceeded 5 seconds. "
+            "Detaching and continuing in the background for transaction ID: %s", 
+            firestore_payload.get('id')
         )
-        return _send_to_fallback(env, firestore_payload)
-
-    try:
-        _logger.info('Sending payment request to Firestore: %s', pprint.pformat(payload))
-        db = firestore.client()
-        doc_ref = db.collection('transactions').document()
-        doc_ref.set(firestore_payload)
-        _logger.info(
-            'Sent payment request to Firestore successfully. Document ID: %s. Payload: %s',
-            doc_ref.id,
-            pprint.pformat(firestore_payload),
-        )
+        # Thread continues running in background safely
         return True
-    except Exception as e:
-        _logger.error("Failed to send payment request to Firestore: %s", str(e))
-        _logger.info("Attempting Seerbit fallback endpoint after Firestore error...")
-        return _send_to_fallback(env, firestore_payload)
-
+        
+    return True
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
-
     
-    # Seerbit Fields
+    # Branch public key comes from company Seerbit settings (not stored per payment method).
     seerbit_public_key = fields.Char(
-        string="Seerbit Public Key", 
-        help="As provided on Seerbit dashboard", 
-        copy=False
+        string="Seerbit Public Key",
+        compute='_compute_seerbit_public_key',
+        help="Resolved from this payment method's company Seerbit settings.",
     )
     seerbit_terminal_id = fields.Char(
         string="Seerbit Terminal ID", 
         help="Terminal ID as provided on Seerbit dashboard", 
         copy=False
     )
-    seerbit_latest_response = fields.Char(
-        copy=False, 
-        groups="base.group_erp_manager,point_of_sale.group_pos_user"     
-    )  # used to buffer the latest asynchronous notification from Seerbit.
-    
+    # Transient buffer for async Seerbit notifications. No field groups — POS session
+    # load reads this as the terminal user; ERP-manager groups caused ACL denials.
+    seerbit_latest_response = fields.Char(copy=False)
+
+    @api.depends('company_id', 'company_id.seerbit_public_key')
+    def _compute_seerbit_public_key(self):
+        for pm in self:
+            pm.seerbit_public_key = pm.company_id.seerbit_public_key or ''
+
     def _get_payment_terminal_selection(self):
         
         return super()._get_payment_terminal_selection() + [("seerbit", "Seerbit")]
 
 
     @api.model
-    def _load_pos_data_fields(self, config_id):
-       data = super()._load_pos_data_fields(config_id)
-       data += ['seerbit_terminal_id','seerbit_public_key', 'seerbit_latest_response']
-       return data
-    @api.constrains('seerbit_terminal_id')
-    def _check_seerbit_autoconfirm(self):
-        for payment_method in self:
-            if not (payment_method.seerbit_public_key and payment_method.seerbit_terminal_id):
-                continue
-            # Payment methods are now expected to separate at the account levels irrepective of the number of terminals
-            
-            existing_key = self.search(
-                [("id", "!=", payment_method.id), ("seerbit_terminal_id",
-                                                   "=", payment_method.seerbit_terminal_id)],
-                limit=1,
-            )
-        
-            if existing_key:
-                # Restricting duplicate terminals
-                raise ValidationError(
-                    _("Seerbit terminal %s is already used on payment method %s.")
-                    % (payment_method.seerbit_terminal_id, existing_key.display_name)
-                )
+    def _load_pos_data_fields(self, config):
+        data = super()._load_pos_data_fields(config)
+        data += ['seerbit_terminal_id', 'seerbit_public_key', 'seerbit_latest_response']
+        return data
+
+    @api.constrains("seerbit_terminal_id")
+    def _check_seerbit_terminal_share(self):
+        """Same terminal ID may be shared across payment methods (e.g. Small Chops 1 & 2)."""
+        return
 
     def _is_write_forbidden(self, fields):
         whitelisted_fields = {"seerbit_latest_response"}
@@ -261,18 +254,19 @@ class PosPaymentMethod(models.Model):
 
     def send_seerbit_payment_request(self, payload):
         self.ensure_one()
-        ok = send_to_firestore_transactions(self.env, payload)
-        if ok:
+        
+        
+        # Try to send to Firestore
+        firestore_success = send_to_firestore_transactions(self.env, payload)
+        
+        if firestore_success:
             _logger.info(
-                "Seerbit payment request delivered for transaction ID: %s",
-                payload.get('id', 'unknown'),
-            )
+                "Seerbit payment request processed successfully for transaction ID: %s", payload.get('id', 'unknown'))
         else:
             _logger.warning(
-                "Seerbit payment request could not be delivered (Firestore and fallback failed) for transaction ID: %s",
-                payload.get('id', 'unknown'),
-            )
-        return ok
+                "Seerbit payment request saved to Odoo but Firestore send failed for transaction ID: %s", payload.get('id', 'unknown'))
+        
+        return False
 
     def get_latest_seerbit_status(self, expected):
         self.ensure_one()
